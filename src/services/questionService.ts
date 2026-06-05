@@ -374,3 +374,18 @@ export async function renameTopicDirect(oldName: string, oldSubject: string, new
 
     await batch.commit();
 }
+
+export async function renameSubject(oldName: string, newName: string, userId: string): Promise<void> {
+    if (!userId || !newName.trim()) return;
+    const batch = writeBatch(db);
+
+    const q = query(collection(db, QUESTIONS_COLLECTION), where('subject', '==', oldName), where('userId', '==', userId));
+    const qSnapshot = await getDocs(q);
+    qSnapshot.docs.forEach(d => batch.update(d.ref, { subject: newName.trim() }));
+
+    const t = query(collection(db, TOPICS_COLLECTION), where('subject', '==', oldName), where('userId', '==', userId));
+    const tSnapshot = await getDocs(t);
+    tSnapshot.docs.forEach(d => batch.update(d.ref, { subject: newName.trim() }));
+
+    await batch.commit();
+}

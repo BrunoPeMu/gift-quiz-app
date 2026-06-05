@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData } from '../services/questionService';
+import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData, renameSubject } from '../services/questionService';
 import { parseGIFT } from '../lib/giftParser';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
@@ -30,6 +30,7 @@ export default function ManageContentPage() {
     const [allTopicsData, setAllTopicsData] = useState<{ name: string; subject?: string }[]>([]);
     const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
     const [editingTopic, setEditingTopic] = useState<{ oldName: string; oldSubject: string; newName: string; newSubject: string } | null>(null);
+    const [editingSubject, setEditingSubject] = useState<{ oldName: string; newName: string } | null>(null);
     const [addingTopic, setAddingTopic] = useState(false);
     const [newTopicName, setNewTopicName] = useState('');
     const [newTopicSubject, setNewTopicSubject] = useState('');
@@ -178,6 +179,18 @@ export default function ManageContentPage() {
             await updateTopicSubject(newName.trim(), oldSubject, newSubject, currentUser.uid);
         }
         setEditingTopic(null);
+        loadData();
+    };
+
+    const handleRenameSubject = async () => {
+        if (!currentUser || !editingSubject) return;
+        const { oldName, newName } = editingSubject;
+        if (!newName.trim() || oldName === newName.trim()) {
+            setEditingSubject(null);
+            return;
+        }
+        await renameSubject(oldName, newName.trim(), currentUser.uid);
+        setEditingSubject(null);
         loadData();
     };
 
@@ -374,22 +387,38 @@ export default function ManageContentPage() {
                     {subjectGroups.map(group => {
                         const isExpanded = expandedSubjects.has(group.name);
                         const isUncategorized = group.name === 'Sin asignatura';
+                        const isEditingSubject = editingSubject?.oldName === group.name;
 
                         return (
                             <div key={group.name} className="mb-3">
-                                {/* Subject Header - clickable toggle */}
-                                <button
-                                    onClick={() => toggleSubjectExpand(group.name)}
-                                    className={`w-full flex items-center p-4 rounded-xl border transition-all ${isUncategorized
-                                        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
-                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
-                                        }`}
-                                >
-                                    {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400 mr-3" /> : <ChevronRight className="w-5 h-5 text-slate-400 mr-3" />}
-                                    <FolderOpen className={`w-5 h-5 mr-3 flex-shrink-0 ${isUncategorized ? 'text-slate-400' : 'text-indigo-500'}`} />
-                                    <span className="flex-1 text-left font-semibold text-slate-900 dark:text-white">{group.name}</span>
-                                    <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">{group.topics.length} temas · {group.questionCount} preguntas</span>
-                                </button>
+                                {/* Subject Header */}
+                                <div className={`flex items-center p-4 rounded-xl border transition-all ${isUncategorized
+                                    ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
+                                    }`}>
+                                    {isEditingSubject ? (
+                                        <div className="flex-1 flex gap-2 items-center">
+                                            <FolderOpen className="w-5 h-5 text-indigo-500 mr-3 flex-shrink-0" />
+                                            <input type="text" value={editingSubject.newName} onChange={(e) => setEditingSubject({ ...editingSubject, newName: e.target.value })} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-semibold" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleRenameSubject()} />
+                                            <button onClick={handleRenameSubject} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"><Save className="w-4 h-4" /></button>
+                                            <button onClick={() => setEditingSubject(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => toggleSubjectExpand(group.name)} className="flex-1 flex items-center">
+                                                {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400 mr-3" /> : <ChevronRight className="w-5 h-5 text-slate-400 mr-3" />}
+                                                <FolderOpen className={`w-5 h-5 mr-3 flex-shrink-0 ${isUncategorized ? 'text-slate-400' : 'text-indigo-500'}`} />
+                                                <span className="flex-1 text-left font-semibold text-slate-900 dark:text-white">{group.name}</span>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">{group.topics.length} temas · {group.questionCount} preguntas</span>
+                                            </button>
+                                            {!isUncategorized && (
+                                                <button onClick={() => setEditingSubject({ oldName: group.name, newName: group.name })} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg ml-2" title="Renombrar asignatura">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
 
                                 {/* Topics List */}
                                 {isExpanded && (
