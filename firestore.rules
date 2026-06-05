@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default: Deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users: Users can read/write only their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Quizzes: Authenticated users can create and read quizzes
+    // Needs refinement if specific sharing logic exists, but this is a good secure start
+    // Quizzes (Legacy or new feature?)
+    match /quizzes/{quizId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Questions: Users own their questions
+    match /questions/{questionId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.userId == 'guest');
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Topics: Users own their topics
+    match /topics/{topicId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Subjects: Users own their subjects
+    match /subjects/{subjectId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Progress: Users own their progress
+    match /progress/{progressId} {
+       allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}

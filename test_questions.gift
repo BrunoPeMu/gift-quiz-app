@@ -1,0 +1,13 @@
+// Selección Múltiple
+¿Quién es el actual presidente de Francia? {
+=Emmanuel Macron
+~Angela Merkel
+~Donald Trump
+~Boris Johnson
+}
+
+// Verdadero/Falso
+El sol sale por el este. {TRUE}
+
+// Respuesta Corta
+¿Cuál es la capital de España? {=Madrid =madrid}

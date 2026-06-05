@@ -1,0 +1,197 @@
+{
+    "nav": {
+        "home": "Dashboard",
+        "takeQuiz": "Take Quiz",
+        "upload": "Upload",
+        "manage": "Manage",
+        "login": "Login",
+        "logout": "Log Out",
+        "profile": "Profile"
+    },
+    "common": {
+        "uncategorized": "Uncategorized",
+        "save": "Save",
+        "cancel": "Cancel"
+    },
+    "auth": {
+        "continueWithApple": "Continue with Apple",
+        "errorEmailInUse": "This email is already registered.",
+        "errorInvalidCredential": "Account not found or incorrect password. Please Sign Up if you are new.",
+        "errorWeakPassword": "Password should be at least 6 characters.",
+        "errorGeneric": "Authentication failed"
+    },
+    "config": {
+        "title": "Quiz Configuration",
+        "newTestTitle": "Configure New Quiz",
+        "progress": "Your Progress",
+        "noTopics": "No topics yet. Add one or upload questions!",
+        "addTopic": "Add Topic",
+        "newTopicName": "New Topic Name",
+        "topic": "Topic",
+        "questionsCount": "{{count}} questions",
+        "empty": "Empty",
+        "difficulty": "Difficulty",
+        "count": "Number of Questions",
+        "mode": "Selection Mode",
+        "penalty": "Penalty per Mistake",
+        "penalties": {
+            "0": "No penalty",
+            "0.25": "Deduct 25% (-0.25)",
+            "0.33": "Deduct 33% (-0.33)",
+            "0.5": "Deduct 50% (-0.5)",
+            "1": "Deduct 100% (-1.0)"
+        },
+        "start": "Start Quiz",
+        "modes": {
+            "random": {
+                "label": "Random",
+                "desc": "Random selection"
+            },
+            "smart": {
+                "label": "Smart Review",
+                "desc": "Prioritize new/wrong"
+            },
+            "sequential": {
+                "label": "Sequential",
+                "desc": "In creation order"
+            },
+            "retry": {
+                "label": "Retry Failures",
+                "desc": "Only wrong answers"
+            }
+        },
+        "difficulties": {
+            "mixed": "Mixed",
+            "easy": "Easy",
+            "medium": "Medium",
+            "hard": "Hard"
+        },
+        "noQuestionsAvailable": "No questions available for this selection."
+    },
+    "dashboard": {
+        "welcome": "Welcome back, {{name}}!",
+        "guest": "Student",
+        "guestWelcome": "Take your learning to the next level!",
+        "guestMessage": "Don't lose your progress. Create a free account to save your stats, identify weak spots, and access your data from any device. Join now and start improving your results today!",
+        "editProfile": "Edit Profile",
+        "saveProfile": "Save Profile",
+        "nickName": "Nickname (Display Name)",
+        "handle": "Public Handle (@username)",
+        "internalId": "Internal ID (Database UID)",
+        "avatarUrl": "Avatar URL",
+        "cancel": "Cancel",
+        "subtitle": "Ready to master your subjects? Track your progress and keep improving.",
+        "startQuiz": "Start New Quiz",
+        "stats": {
+            "quizzesTaken": "Quizzes Completed",
+            "avgScore": "Average Score",
+            "mastery": "Topics Mastered"
+        },
+        "tips": {
+            "title": "Study Tips for Success",
+            "spacedRepetition": {
+                "title": "Spaced Repetition",
+                "desc": "Reviewing material at increasing intervals boosts long-term retention significantly."
+            },
+            "activeRecall": {
+                "title": "Active Recall",
+                "desc": "Testing yourself is more effective than re-reading. Challenge your brain!"
+            },
+            "mixTopics": {
+                "title": "Interleaved Practice",
+                "desc": "Mixing different topics improves your ability to solve problems in any context."
+            }
+        }
+    },
+    "quiz": {
+        "question": "Question",
+        "of": "of",
+        "score": "Score",
+        "finish": "Finish Quiz",
+        "next": "Next Question",
+        "feedback": "Feedback",
+        "loading": "Loading quiz...",
+        "noQuestions": "No questions found matching your filter.",
+        "editVisual": "Visual Editor",
+        "editCode": "GIFT Source Editor",
+        "questionText": "Question Text",
+        "type": "Question Type",
+        "answers": "Answers",
+        "optional": "Optional",
+        "help": {
+            "structure": "Answer Structure",
+            "structureDesc": "Enter the answer text in the large box. If you want to provide specific feedback for this answer, you can include it after a '#' symbol (e.g. 'Paris #Correct, it is the capital').",
+            "fillInBlank": "Tip: Use '_____' (5 underscores) in the question text to specify where the blank should appear. Otherwise, it will be placed at the end."
+        },
+        "report": "Report Issue",
+        "reportSuccess": "Question reported and disabled."
+    },
+    "results": {
+        "title": "Quiz Results",
+        "score": "Final Score",
+        "review": "Review",
+        "correct": "Correct",
+        "incorrect": "Incorrect",
+        "yourAnswer": "Your answer",
+        "correctAnswer": "Correct answer",
+        "tryAgain": "Try Again",
+        "home": "Home",
+        "summary": "You got {{score}} out of {{total}} questions correct."
+    },
+    "upload": {
+        "title": "Upload GIFT Questions",
+        "paste": "Paste your GIFT content here",
+        "topic": "Topic",
+        "difficulty": "Difficulty",
+        "parse": "Parse & Preview",
+        "save": "Save to Database",
+        "preview": "Preview",
+        "success": "Questions saved successfully!",
+        "error": "Error saving questions. Please try again.",
+        "saving": "Saving...",
+        "questionsParsed": "questions parsed",
+        "tabs": {
+            "manual": "GIFT Code",
+            "visual": "Visual Editor",
+            "ai": "Generate with AI"
+        },
+        "ai": {
+            "sourceText": "Source Text",
+            "sourcePlaceholder": "Paste your notes, article, or text here...",
+            "questionTypes": "Question Types",
+            "types": {
+                "mcq": "Multiple Choice",
+                "tf": "True/False",
+                "sa": "Short Answer"
+            },
+            "count": "Number of Questions: {{count}}",
+            "generate": "Generate Questions",
+            "generating": "Generating...",
+            "errors": {
+                "apiKey": "API Key not found. Please add VITE_GEMINI_API_KEY to your .env file.",
+                "sourceText": "Source text is required"
+            }
+        }
+    },
+    "manage": {
+        "title": "Manage Questions",
+        "filter": "Show:",
+        "all": "All",
+        "active": "Active",
+        "disabled": "Disabled",
+        "edit": "Edit",
+        "enable": "Enable",
+        "disable": "Disable",
+        "save": "Save Changes",
+        "cancel": "Cancel",
+        "uncategorized": "Uncategorized",
+        "noQuestions": "No questions.",
+        "validation": {
+            "empty": "Question cannot be empty.",
+            "brace_mismatch": "Mismatched braces '{' or '}'.",
+            "no_answer_block": "No answer block {...} found.",
+            "empty_answer_block": "Answer block is empty.",
+            "valid": "Valid format"
+        }
+    }
+}

@@ -1,0 +1,229 @@
+{
+    "nav": {
+        "home": "Inicio",
+        "takeQuiz": "Hacer Test",
+        "upload": "Subir",
+        "manage": "Gestionar",
+        "subjects": "Asignaturas",
+        "login": "Entrar",
+        "logout": "Cerrar Sesión",
+        "profile": "Perfil"
+    },
+    "common": {
+        "uncategorized": "Sin Categoría",
+        "save": "Guardar",
+        "cancel": "Cancelar"
+    },
+    "auth": {
+        "continueWithApple": "Continuar con Apple",
+        "errorEmailInUse": "Este correo ya está registrado.",
+        "errorInvalidCredential": "Usuario no encontrado o contraseña incorrecta. Por favor, Regístrate si eres nuevo.",
+        "errorWeakPassword": "La contraseña debe tener al menos 6 caracteres.",
+        "errorGeneric": "Error de autenticación"
+    },
+    "config": {
+        "title": "Configuración del Test",
+        "newTestTitle": "Configurar Nuevo Test",
+        "progress": "Tu Progreso",
+        "noTopics": "No hay temas todavía. ¡Añade uno o sube preguntas!",
+        "addTopic": "Añadir Tema",
+        "newTopicName": "Nombre del nuevo tema",
+        "newTopicPlaceholder": "Nombre del nuevo tema",
+        "topic": "Tema",
+        "questionsCount": "{{count}} preguntas",
+        "start": "Comenzar Test",
+        "savedConfigs": "Configuraciones Guardadas",
+        "saveCurrentConfig": "Guardar configuración actual",
+        "configNamePlaceholder": "Nombre de la configuración",
+        "noSavedConfigs": "No hay configuraciones guardadas",
+        "penalty": "Penalización por fallo",
+        "penalties": {
+            "0": "Sin penalización",
+            "0.25": "25% (1/4)",
+            "0.33": "33% (1/3)",
+            "0.5": "50% (1/2)",
+            "1": "100% (1/1)"
+        },
+        "difficulties": {
+            "mixed": "Mixto",
+            "easy": "Fácil",
+            "medium": "Medio",
+            "hard": "Difícil"
+        },
+        "modes": {
+            "random": {
+                "label": "Aleatorio",
+                "desc": "Preguntas al azar"
+            },
+            "sequential": {
+                "label": "Secuencial",
+                "desc": "En orden original"
+            },
+            "smart": {
+                "label": "Inteligente",
+                "desc": "Prioriza fallos previos"
+            },
+            "retry": {
+                "label": "Reintentar",
+                "desc": "Solo preguntas falladas"
+            }
+        },
+        "count": "Número de preguntas",
+        "questionTypes": "Tipos de Pregunta",
+        "types": {
+            "mc": "Opción Múltiple",
+            "tf": "Verdadero/Falso",
+            "short": "Respuesta Corta"
+        },
+        "maxOptions": "Máx. Opciones (MCQ)",
+        "noQuestionsAvailable": "No hay preguntas disponibles para esta selección."
+    },
+    "dashboard": {
+        "welcome": "¡Hola de nuevo, {{name}}!",
+        "guest": "Estudiante",
+        "guestWelcome": "¡Lleva tu aprendizaje al siguiente nivel!",
+        "guestMessage": "No pierdas tu progreso. Crea una cuenta gratuita para guardar tus estadísticas, identificar tus puntos débiles y acceder desde cualquier dispositivo. ¡Únete ahora y empieza a mejorar tus resultados hoy mismo!",
+        "editProfile": "Editar Perfil",
+        "saveProfile": "Guardar Perfil",
+        "nickName": "Apodo (Nombre para mostrar)",
+        "handle": "Usuario Público (@usuario)",
+        "internalId": "ID Interno (UID Base de Datos)",
+        "avatarUrl": "URL del Avatar",
+        "theme": "Tema",
+        "themes": {
+            "system": "Sistema",
+            "light": "Claro",
+            "dark": "Oscuro"
+        },
+        "upgradeToPremium": "Mejorar a Premium (Simulado)",
+        "cancel": "Cancelar",
+        "subtitle": "¿Listo para dominar tus asignaturas? Sigue tu progreso y mejora cada día.",
+        "startQuiz": "Comenzar Nuevo Test",
+        "stats": {
+            "quizzesTaken": "Tests Completados",
+            "avgScore": "Nota Media",
+            "mastery": "Temas Dominados"
+        },
+        "tips": {
+            "title": "Consejos para el Éxito",
+            "spacedRepetition": {
+                "title": "Repetición Espaciada",
+                "desc": "Repasar el material en intervalos crecientes mejora drásticamente la retención a largo plazo."
+            },
+            "activeRecall": {
+                "title": "Recuerdo Activo",
+                "desc": "Ponerte a prueba es más efectivo que releer. ¡Desafía a tu cerebro!"
+            },
+            "mixTopics": {
+                "title": "Práctica Intercalada",
+                "desc": "Mezclar diferentes temas mejora tu capacidad para resolver problemas en cualquier contexto."
+            }
+        }
+    },
+    "quiz": {
+        "question": "Pregunta",
+        "of": "de",
+        "score": "Puntuación",
+        "finish": "Finalizar Test",
+        "next": "Siguiente Pregunta",
+        "feedback": "Retroalimentación",
+        "loading": "Cargando test...",
+        "noQuestions": "No se encontraron preguntas con este filtro.",
+        "editVisual": "Editor Visual",
+        "editCode": "Editor de Código GIFT",
+        "questionText": "Enunciado de la Pregunta",
+        "type": "Tipo de Pregunta",
+        "answers": "Respuestas",
+        "optional": "Opcional",
+        "help": {
+            "structure": "Estructura de Respuesta",
+            "structureDesc": "Escribe el texto de la respuesta en el recuadro grande. Si quieres añadir feedback específico para esta respuesta, puedes hacerlo añadiendo '#' al final (ej. 'París #Correcto, es la capital').",
+            "fillInBlank": "Consejo: Usa '_____' (5 guiones bajos) en el texto de la pregunta para indicar dónde debe ir el hueco. Si no, se pondrá al final."
+        },
+        "report": "Reportar Error",
+        "reportSuccess": "Gracias por tu reporte. Revisaremos la pregunta."
+    },
+    "results": {
+        "title": "Resultados del Test",
+        "noResults": "No se encontraron resultados.",
+        "score": "Puntuación Final",
+        "review": "Revisión",
+        "correct": "Correcto",
+        "incorrect": "Incorrecto",
+        "yourAnswer": "Tu respuesta",
+        "correctAnswer": "Respuesta correcta",
+        "tryAgain": "Intentar de nuevo",
+        "home": "Inicio",
+        "summary": "Has acertado {{score}} de {{total}} preguntas."
+    },
+    "upload": {
+        "title": "Subir Preguntas GIFT",
+        "paste": "Pega tu contenido GIFT aquí",
+        "topic": "Tema",
+        "subject": "Asignatura (Opcional)",
+        "subjectPlaceholder": "ej. Matemáticas, Ciencias",
+        "topicPlaceholder": "ej. Álgebra, Cálculo",
+        "giftContent": "Contenido GIFT",
+        "parseQuestions": "Analizar Preguntas",
+        "answer": "Respuesta: ",
+        "options": "Opciones: ",
+        "difficulty": "Dificultad",
+        "parse": "Analizar y Previsualizar",
+        "save": "Guardar en Base de Datos",
+        "preview": "Vista Previa",
+        "success": "¡Preguntas guardadas correctamente!",
+        "error": "Error al guardar preguntas. Inténtalo de nuevo.",
+        "saveError": "Error al guardar. Inténtalo de nuevo.",
+        "saving": "Guardando...",
+        "questionsParsed": "preguntas analizadas",
+        "tabs": {
+            "manual": "Código GIFT",
+            "visual": "Editor Visual",
+            "ai": "Generar con IA"
+        },
+        "ai": {
+            "sourceText": "Texto Fuente",
+            "sourcePlaceholder": "Pega tus apuntes, artículo o texto aquí...",
+            "questionTypes": "Tipos de Pregunta",
+            "types": {
+                "mcq": "Opción Múltiple",
+                "tf": "Verdadero/Falso",
+                "sa": "Respuesta Corta"
+            },
+            "count": "Número de Preguntas: {{count}}",
+            "generate": "Generar Preguntas",
+            "generating": "Generando...",
+            "noKey": "No se encontró la API Key.",
+            "error": "Error en la generación.",
+            "errors": {
+                "apiKey": "No se encontró la API Key. Por favor añade VITE_GEMINI_API_KEY a tu archivo .env.",
+                "sourceText": "El texto fuente es obligatorio"
+            }
+        }
+    },
+    "manage": {
+        "title": "Gestión de Preguntas",
+        "filter": "Mostrar:",
+        "all": "Todas",
+        "active": "Activas",
+        "disabled": "Desactivadas",
+        "edit": "Editar",
+        "enable": "Activar",
+        "disable": "Desactivar",
+        "save": "Guardar Cambios",
+        "cancel": "Cancelar",
+        "uncategorized": "Sin Categoría",
+        "noQuestions": "No hay preguntas.",
+        "validation": {
+            "empty": "La pregunta no puede estar vacía.",
+            "brace_mismatch": "Faltan llaves de apertura '{' o cierre '}'.",
+            "no_answer_block": "No se encontró bloque de respuesta {...}.",
+            "empty_answer_block": "El bloque de respuesta está vacío.",
+            "valid": "Formato válido"
+        }
+    },
+    "ad": {
+        "title": "Publicidad",
+        "cta": "Mejora a Premium para eliminar anuncios"
+    }
+}
