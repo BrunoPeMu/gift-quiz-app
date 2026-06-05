@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getQuestions, updateQuestion, deleteTopic, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData } from '../services/questionService';
+import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData } from '../services/questionService';
 import { parseGIFT } from '../lib/giftParser';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
@@ -36,6 +36,9 @@ export default function ManageContentPage() {
     const [filterSubject, setFilterSubject] = useState('');
     const [filterTopic, setFilterTopic] = useState('');
     const [filterDifficulty, setFilterDifficulty] = useState('');
+    const [deletingTopic, setDeletingTopic] = useState<{ name: string; subject: string; questionCount: number } | null>(null);
+    const [transferTarget, setTransferTarget] = useState('');
+    const [deleteAction, setDeleteAction] = useState<'transfer' | 'orphan' | 'deleteQuestions'>('transfer');
 
     const loadData = async () => {
         if (!currentUser || currentUser.uid === 'guest') return;
@@ -180,8 +183,31 @@ export default function ManageContentPage() {
 
     const handleDeleteTopic = async (topicName: string, subjectName: string) => {
         if (!currentUser) return;
-        if (!confirm(`¿Eliminar el tema "${topicName}"? Las preguntas no se eliminarán.`)) return;
-        await deleteTopic(topicName, subjectName, currentUser.uid);
+        const qCount = questions.filter(q => q.topic === topicName && (subjectName === 'Sin asignatura' ? (!q.subject || q.subject === 'Uncategorized') : q.subject === subjectName)).length;
+        setDeletingTopic({ name: topicName, subject: subjectName, questionCount: qCount });
+        setTransferTarget('');
+        setDeleteAction(qCount > 0 ? 'transfer' : 'orphan');
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!currentUser || !deletingTopic) return;
+        const { name, subject } = deletingTopic;
+
+        if (deleteAction === 'transfer' && transferTarget) {
+            const qList = questions.filter(q => q.topic === name && (subject === 'Sin asignatura' ? (!q.subject || q.subject === 'Uncategorized') : q.subject === subject));
+            for (const q of qList) {
+                await updateQuestion(q.id, currentUser.uid, { topic: transferTarget });
+            }
+        } else if (deleteAction === 'deleteQuestions') {
+            const qList = questions.filter(q => q.topic === name && (subject === 'Sin asignatura' ? (!q.subject || q.subject === 'Uncategorized') : q.subject === subject));
+            for (const q of qList) {
+                await deleteQuestion(q.id, currentUser!.uid);
+            }
+        }
+
+        await deleteTopic(name, subject, currentUser.uid);
+        setDeletingTopic(null);
+        setTransferTarget('');
         loadData();
     };
 
@@ -413,6 +439,60 @@ export default function ManageContentPage() {
                         <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                             <Layers className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                             <p className="text-slate-500 dark:text-slate-400 font-medium">No hay asignaturas ni temas. Crea contenido para empezar.</p>
+                        </div>
+                    )}
+
+                    {/* Delete Topic Modal */}
+                    {deletingTopic && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setDeletingTopic(null)}>
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Eliminar tema &ldquo;{deletingTopic.name}&rdquo;</h3>
+                                {deletingTopic.questionCount > 0 ? (
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Este tema tiene <span className="font-semibold text-slate-700 dark:text-slate-200">{deletingTopic.questionCount} preguntas</span>. ¿Qué quieres hacer?</p>
+                                ) : (
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Este tema no tiene preguntas. ¿Confirmas la eliminación?</p>
+                                )}
+
+                                {deletingTopic.questionCount > 0 && (
+                                    <div className="space-y-3 mb-6">
+                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                            <input type="radio" name="deleteAction" value="transfer" checked={deleteAction === 'transfer'} onChange={() => setDeleteAction('transfer')} className="mt-1" />
+                                            <div className="flex-1">
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Trasladar preguntas a otro tema</span>
+                                                {deleteAction === 'transfer' && (
+                                                    <select value={transferTarget} onChange={(e) => setTransferTarget(e.target.value)} className="mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm">
+                                                        <option value="">Seleccionar tema destino...</option>
+                                                        {subjectGroups.flatMap(g => g.topics.filter(t => t !== deletingTopic.name).map(t => ({ topic: t, subject: g.name }))).map(({ topic, subject }) => (
+                                                            <option key={`${subject}/${topic}`} value={topic}>{topic} ({subject})</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                            </div>
+                                        </label>
+                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                            <input type="radio" name="deleteAction" value="orphan" checked={deleteAction === 'orphan'} onChange={() => setDeleteAction('orphan')} className="mt-1" />
+                                            <div>
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Eliminar tema, dejar preguntas sin tema</span>
+                                                <p className="text-xs text-slate-400 mt-0.5">Las preguntas seguirán existiendo pero sin tema asignado</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-red-200 dark:border-red-900/50 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20">
+                                            <input type="radio" name="deleteAction" value="deleteQuestions" checked={deleteAction === 'deleteQuestions'} onChange={() => setDeleteAction('deleteQuestions')} className="mt-1" />
+                                            <div>
+                                                <span className="text-sm font-medium text-red-600 dark:text-red-400">Eliminar tema y sus preguntas</span>
+                                                <p className="text-xs text-red-400 mt-0.5">Esta acción no se puede deshacer</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2 justify-end">
+                                    <button onClick={() => setDeletingTopic(null)} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">Cancelar</button>
+                                    <button onClick={handleConfirmDelete} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${deleteAction === 'deleteQuestions' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                                        {deleteAction === 'transfer' ? 'Trasladar y eliminar' : deleteAction === 'deleteQuestions' ? 'Eliminar todo' : 'Eliminar tema'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

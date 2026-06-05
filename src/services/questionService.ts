@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, Timestamp, doc, updateDoc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, Timestamp, doc, updateDoc, setDoc, getDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Question } from '../types';
 
@@ -293,6 +293,15 @@ export async function migrateLegacyData(userId: string, forceAll = false) {
     await Promise.all(pUpdates);
 
     return count;
+}
+
+export async function deleteQuestion(id: string, userId: string): Promise<void> {
+    if (!userId) throw new Error("userId is required");
+    const docRef = doc(db, QUESTIONS_COLLECTION, id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && docSnap.data().userId === userId) {
+        await deleteDoc(docRef);
+    }
 }
 
 export async function deleteTopic(topicName: string, subjectName: string, userId: string): Promise<void> {
