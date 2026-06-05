@@ -389,3 +389,24 @@ export async function renameSubject(oldName: string, newName: string, userId: st
 
     await batch.commit();
 }
+
+export async function deleteSubject(subjectName: string, userId: string, action: 'transfer' | 'orphan' | 'deleteAll', targetSubject?: string): Promise<void> {
+    if (!userId) return;
+    const batch = writeBatch(db);
+
+    const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('subject', '==', subjectName), where('userId', '==', userId)));
+    const tSnap = await getDocs(query(collection(db, TOPICS_COLLECTION), where('subject', '==', subjectName), where('userId', '==', userId)));
+
+    if (action === 'transfer' && targetSubject) {
+        qSnap.docs.forEach(d => batch.update(d.ref, { subject: targetSubject }));
+        tSnap.docs.forEach(d => batch.update(d.ref, { subject: targetSubject }));
+    } else if (action === 'orphan') {
+        qSnap.docs.forEach(d => batch.update(d.ref, { subject: null }));
+        tSnap.docs.forEach(d => batch.update(d.ref, { subject: null }));
+    } else if (action === 'deleteAll') {
+        qSnap.docs.forEach(d => batch.delete(d.ref));
+        tSnap.docs.forEach(d => batch.delete(d.ref));
+    }
+
+    await batch.commit();
+}

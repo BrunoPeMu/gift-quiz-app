@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData, renameSubject } from '../services/questionService';
+import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData, renameSubject, deleteSubject } from '../services/questionService';
 import { parseGIFT } from '../lib/giftParser';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
@@ -31,6 +31,9 @@ export default function ManageContentPage() {
     const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
     const [editingTopic, setEditingTopic] = useState<{ oldName: string; oldSubject: string; newName: string; newSubject: string } | null>(null);
     const [editingSubject, setEditingSubject] = useState<{ oldName: string; newName: string } | null>(null);
+    const [deletingSubject, setDeletingSubject] = useState<{ name: string; topicCount: number; questionCount: number } | null>(null);
+    const [subjectDeleteAction, setSubjectDeleteAction] = useState<'transfer' | 'orphan' | 'deleteAll'>('transfer');
+    const [subjectDeleteTarget, setSubjectDeleteTarget] = useState('');
     const [addingTopic, setAddingTopic] = useState(false);
     const [newTopicName, setNewTopicName] = useState('');
     const [newTopicSubject, setNewTopicSubject] = useState('');
@@ -191,6 +194,23 @@ export default function ManageContentPage() {
         }
         await renameSubject(oldName, newName.trim(), currentUser.uid);
         setEditingSubject(null);
+        loadData();
+    };
+
+    const handleDeleteSubject = (subjectName: string) => {
+        if (!currentUser) return;
+        const group = subjectGroups.find(g => g.name === subjectName);
+        if (!group) return;
+        setDeletingSubject({ name: subjectName, topicCount: group.topics.length, questionCount: group.questionCount });
+        setSubjectDeleteTarget('');
+        setSubjectDeleteAction(group.topics.length > 0 || group.questionCount > 0 ? 'transfer' : 'orphan');
+    };
+
+    const handleConfirmDeleteSubject = async () => {
+        if (!currentUser || !deletingSubject) return;
+        await deleteSubject(deletingSubject.name, currentUser.uid, subjectDeleteAction, subjectDeleteTarget || undefined);
+        setDeletingSubject(null);
+        setSubjectDeleteTarget('');
         loadData();
     };
 
@@ -412,9 +432,14 @@ export default function ManageContentPage() {
                                                 <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">{group.topics.length} temas · {group.questionCount} preguntas</span>
                                             </button>
                                             {!isUncategorized && (
-                                                <button onClick={() => setEditingSubject({ oldName: group.name, newName: group.name })} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg ml-2" title="Renombrar asignatura">
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                </button>
+                                                <div className="flex items-center gap-1 ml-2">
+                                                    <button onClick={() => setEditingSubject({ oldName: group.name, newName: group.name })} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg" title="Renombrar asignatura">
+                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteSubject(group.name)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Eliminar asignatura">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                             )}
                                         </>
                                     )}
@@ -519,6 +544,60 @@ export default function ManageContentPage() {
                                     <button onClick={() => setDeletingTopic(null)} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">Cancelar</button>
                                     <button onClick={handleConfirmDelete} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${deleteAction === 'deleteQuestions' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
                                         {deleteAction === 'transfer' ? 'Trasladar y eliminar' : deleteAction === 'deleteQuestions' ? 'Eliminar todo' : 'Eliminar tema'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Delete Subject Modal */}
+                    {deletingSubject && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setDeletingSubject(null)}>
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Eliminar asignatura &ldquo;{deletingSubject.name}&rdquo;</h3>
+                                {(deletingSubject.topicCount > 0 || deletingSubject.questionCount > 0) ? (
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Esta asignatura tiene <span className="font-semibold text-slate-700 dark:text-slate-200">{deletingSubject.topicCount} temas</span> y <span className="font-semibold text-slate-700 dark:text-slate-200">{deletingSubject.questionCount} preguntas</span>. ¿Qué quieres hacer?</p>
+                                ) : (
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Esta asignatura no tiene temas ni preguntas. ¿Confirmas la eliminación?</p>
+                                )}
+
+                                {(deletingSubject.topicCount > 0 || deletingSubject.questionCount > 0) && (
+                                    <div className="space-y-3 mb-6">
+                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                            <input type="radio" name="subjectDeleteAction" value="transfer" checked={subjectDeleteAction === 'transfer'} onChange={() => setSubjectDeleteAction('transfer')} className="mt-1" />
+                                            <div className="flex-1">
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Reubicar temas y preguntas a otra asignatura</span>
+                                                {subjectDeleteAction === 'transfer' && (
+                                                    <select value={subjectDeleteTarget} onChange={(e) => setSubjectDeleteTarget(e.target.value)} className="mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm">
+                                                        <option value="">Seleccionar asignatura destino...</option>
+                                                        {subjectGroups.filter(g => g.name !== deletingSubject.name && g.name !== 'Sin asignatura').map(g => (
+                                                            <option key={g.name} value={g.name}>{g.name}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                            </div>
+                                        </label>
+                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                            <input type="radio" name="subjectDeleteAction" value="orphan" checked={subjectDeleteAction === 'orphan'} onChange={() => setSubjectDeleteAction('orphan')} className="mt-1" />
+                                            <div>
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Eliminar asignatura, dejar temas sin asignatura</span>
+                                                <p className="text-xs text-slate-400 mt-0.5">Temas y preguntas irán a "Sin asignatura"</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-red-200 dark:border-red-900/50 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20">
+                                            <input type="radio" name="subjectDeleteAction" value="deleteAll" checked={subjectDeleteAction === 'deleteAll'} onChange={() => setSubjectDeleteAction('deleteAll')} className="mt-1" />
+                                            <div>
+                                                <span className="text-sm font-medium text-red-600 dark:text-red-400">Eliminar todo</span>
+                                                <p className="text-xs text-red-400 mt-0.5">Asignatura, temas y preguntas se eliminarán permanentemente</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2 justify-end">
+                                    <button onClick={() => setDeletingSubject(null)} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">Cancelar</button>
+                                    <button onClick={handleConfirmDeleteSubject} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${subjectDeleteAction === 'deleteAll' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                                        {subjectDeleteAction === 'transfer' ? 'Reubicar y eliminar' : subjectDeleteAction === 'deleteAll' ? 'Eliminar todo' : 'Eliminar asignatura'}
                                     </button>
                                 </div>
                             </div>
