@@ -116,6 +116,16 @@ export default function ManageContentPage() {
         setFilterTopic('');
     };
 
+    const difficultyOrder = { easy: 0, medium: 1, hard: 2 };
+
+    const sortedQuestions = useMemo(() => {
+        return [...filteredQuestions].sort((a, b) => {
+            const topicCompare = a.topic.localeCompare(b.topic);
+            if (topicCompare !== 0) return topicCompare;
+            return (difficultyOrder[a.difficulty] ?? 1) - (difficultyOrder[b.difficulty] ?? 1);
+        });
+    }, [filteredQuestions]);
+
     const allSubjectNames = useMemo(() => {
         return subjectGroups.filter(s => s.name !== 'Sin asignatura').map(s => s.name);
     }, [subjectGroups]);
@@ -264,13 +274,13 @@ export default function ManageContentPage() {
                     </div>
 
                     <div className="space-y-4">
-                        {filteredQuestions.length === 0 ? (
+                        {                            sortedQuestions.length === 0 ? (
                             <div className="text-center py-20 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                                 <Database className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                                 <p className="text-slate-500 dark:text-slate-400 font-medium">No hay preguntas.</p>
                             </div>
                         ) : (
-                            filteredQuestions.map(q => (
+                            sortedQuestions.map(q => (
                                 <div key={q.id} className={`group bg-white dark:bg-slate-800 rounded-xl border transition-all ${q.disabled ? 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 opacity-75' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'}`}>
                                     <div className="p-5">
                                         <div className="flex justify-between items-start gap-4">
