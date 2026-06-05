@@ -35,6 +35,7 @@ export default function ManageContentPage() {
     const [newTopicSubject, setNewTopicSubject] = useState('');
     const [filterSubject, setFilterSubject] = useState('');
     const [filterTopic, setFilterTopic] = useState('');
+    const [filterDifficulty, setFilterDifficulty] = useState('');
 
     const loadData = async () => {
         if (!currentUser || currentUser.uid === 'guest') return;
@@ -106,7 +107,8 @@ export default function ManageContentPage() {
         const matchesSearch = searchTerm === '' || q.text.toLowerCase().includes(searchTerm.toLowerCase()) || q.topic.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesSubject = filterSubject === '' || q.subject === filterSubject;
         const matchesTopic = filterTopic === '' || q.topic === filterTopic;
-        return matchesFilter && matchesSearch && matchesSubject && matchesTopic;
+        const matchesDifficulty = filterDifficulty === '' || q.difficulty === filterDifficulty;
+        return matchesFilter && matchesSearch && matchesSubject && matchesTopic && matchesDifficulty;
     });
 
     const handleSubjectFilterChange = (subject: string) => {
@@ -248,6 +250,15 @@ export default function ManageContentPage() {
                                 {availableTopicsForFilter.map(t => (
                                     <option key={t} value={t}>{t}</option>
                                 ))}
+                            </select>
+                        </div>
+                        <div className="relative">
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            <select value={filterDifficulty} onChange={(e) => setFilterDifficulty(e.target.value)} className="pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer">
+                                <option value="">Todas las dificultades</option>
+                                <option value="easy">Fácil</option>
+                                <option value="medium">Media</option>
+                                <option value="hard">Difícil</option>
                             </select>
                         </div>
                     </div>
