@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FileText, Check, AlertCircle, Sparkles, Layout, Save, BookOpen, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { parseGIFT } from '../lib/giftParser';
-import { getTopicsData, saveQuestions } from '../services/questionService';
+import { getTopicsData, saveQuestions, addSubject, addTopic } from '../services/questionService';
 import { generateQuestions } from '../services/aiService';
 import { useAuth } from '../contexts/AuthContext';
 import type { Question } from '../types';
@@ -30,6 +30,18 @@ export default function UploadPage() {
             setAvailableSubjects([]);
         }
     }, [currentUser]);
+
+    // Filter topics by selected subject
+    const filteredTopics = useMemo(() => {
+        if (!subject) return availableTopics;
+        return availableTopics.filter(t => t.subject === subject);
+    }, [subject, availableTopics]);
+
+    // Handle subject change - reset topic to avoid orphaned topics
+    const handleSubjectChange = (newSubject: string) => {
+        setSubject(newSubject);
+        setTopic('');
+    };
 
     // Auto-fill subject when topic changes
     const handleTopicChange = (newTopic: string) => {
@@ -118,11 +130,33 @@ export default function UploadPage() {
                 setStatus('error');
                 return;
             }
+
+            // Create new subject if it doesn't exist
+            if (subject && !availableSubjects.includes(subject)) {
+                await addSubject(subject, currentUser.uid);
+            }
+
+            // Create new topic if it doesn't exist
+            if (topic) {
+                const topicExists = availableTopics.some(t => t.name === topic && t.subject === subject);
+                if (!topicExists) {
+                    await addTopic(topic, currentUser.uid, subject || undefined);
+                }
+            }
+
             await saveQuestions(preview, currentUser.uid);
             setStatus('success');
             setPreview([]);
             setText('');
             setAiText('');
+            // Reset topic and subject after save
+            setTopic('');
+            setSubject('');
+            // Refresh available topics
+            const data = await getTopicsData(currentUser.uid);
+            setAvailableTopics(data);
+            const subjects = Array.from(new Set(data.map(t => t.subject || 'Uncategorized'))).filter(s => s !== 'Uncategorized');
+            setAvailableSubjects(subjects as string[]);
         } catch (error: any) {
             console.error("Save failed", error);
             setErrorMsg(t('upload.saveError'));
@@ -180,7 +214,7 @@ export default function UploadPage() {
                     <input
                         type="text"
                         value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
+                        onChange={(e) => handleSubjectChange(e.target.value)}
                         list="subjects-list"
                         className="w-full bg-white dark:bg-slate-800 border-none rounded-xl py-3 px-4 shadow-sm focus:ring-2 focus:ring-indigo-500 placeholder-slate-400 text-slate-900 dark:text-white"
                         placeholder={t('upload.subjectPlaceholder')}
@@ -205,7 +239,7 @@ export default function UploadPage() {
                         placeholder={t('upload.topicPlaceholder')}
                     />
                     <datalist id="topics-list">
-                        {availableTopics.map(t => (
+                        {filteredTopics.map(t => (
                             <option key={t.name} value={t.name} />
                         ))}
                     </datalist>

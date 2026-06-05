@@ -375,6 +375,16 @@ export async function renameTopicDirect(oldName: string, oldSubject: string, new
     await batch.commit();
 }
 
+export async function addSubject(name: string, userId: string): Promise<void> {
+    if (!userId || !name.trim()) return;
+    const subjCol = collection(db, 'subjects');
+    await addDoc(subjCol, {
+        name: name.trim(),
+        userId,
+        createdAt: Date.now()
+    });
+}
+
 export async function renameSubject(oldName: string, newName: string, userId: string): Promise<void> {
     if (!userId || !newName.trim()) return;
     const batch = writeBatch(db);
