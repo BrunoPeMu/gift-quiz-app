@@ -33,6 +33,8 @@ export default function ManageContentPage() {
     const [addingTopic, setAddingTopic] = useState(false);
     const [newTopicName, setNewTopicName] = useState('');
     const [newTopicSubject, setNewTopicSubject] = useState('');
+    const [filterSubject, setFilterSubject] = useState('');
+    const [filterTopic, setFilterTopic] = useState('');
 
     const loadData = async () => {
         if (!currentUser || currentUser.uid === 'guest') return;
@@ -48,12 +50,6 @@ export default function ManageContentPage() {
     useEffect(() => {
         loadData();
     }, [currentUser]);
-
-    const filteredQuestions = questions.filter(q => {
-        const matchesFilter = questionFilter === 'all' ? true : questionFilter === 'active' ? !q.disabled : q.disabled;
-        const matchesSearch = searchTerm === '' || q.text.toLowerCase().includes(searchTerm.toLowerCase()) || q.topic.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesFilter && matchesSearch;
-    });
 
     // Group topics by subject - derive subjects from questions + topics data
     const subjectGroups = useMemo(() => {
@@ -94,11 +90,29 @@ export default function ManageContentPage() {
         return result;
     }, [questions, allTopicsData]);
 
-    console.log('=== Debug ===');
-    console.log('questions:', questions.length);
-    console.log('topics from questions:', [...new Set(questions.map(q => q.topic))]);
-    console.log('allTopicsData:', allTopicsData);
-    console.log('subjectGroups:', subjectGroups.map(g => ({ name: g.name, topics: g.topics, count: g.questionCount })));
+    // Available topics for the topic filter (depends on selected subject)
+    const availableTopicsForFilter = useMemo(() => {
+        if (!filterSubject) {
+            const allTopics = new Set<string>();
+            subjectGroups.forEach(g => g.topics.forEach(t => allTopics.add(t)));
+            return Array.from(allTopics).sort();
+        }
+        const group = subjectGroups.find(g => g.name === filterSubject);
+        return group ? group.topics : [];
+    }, [subjectGroups, filterSubject]);
+
+    const filteredQuestions = questions.filter(q => {
+        const matchesFilter = questionFilter === 'all' ? true : questionFilter === 'active' ? !q.disabled : q.disabled;
+        const matchesSearch = searchTerm === '' || q.text.toLowerCase().includes(searchTerm.toLowerCase()) || q.topic.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSubject = filterSubject === '' || q.subject === filterSubject;
+        const matchesTopic = filterTopic === '' || q.topic === filterTopic;
+        return matchesFilter && matchesSearch && matchesSubject && matchesTopic;
+    });
+
+    const handleSubjectFilterChange = (subject: string) => {
+        setFilterSubject(subject);
+        setFilterTopic('');
+    };
 
     const allSubjectNames = useMemo(() => {
         return subjectGroups.filter(s => s.name !== 'Sin asignatura').map(s => s.name);
@@ -204,8 +218,8 @@ export default function ManageContentPage() {
 
             {activeTab === 'questions' && (
                 <div className="animate-fadeIn">
-                    <div className="flex gap-2 mb-6">
-                        <div className="relative flex-grow">
+                    <div className="flex flex-wrap gap-2 mb-6">
+                        <div className="relative flex-grow min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input type="text" placeholder="Buscar preguntas..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 w-full" />
                         </div>
@@ -215,6 +229,25 @@ export default function ManageContentPage() {
                                 <option value="all">Todas</option>
                                 <option value="active">Activas</option>
                                 <option value="disabled">Desactivadas</option>
+                            </select>
+                        </div>
+                        <div className="relative">
+                            <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <select value={filterSubject} onChange={(e) => handleSubjectFilterChange(e.target.value)} className="pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer">
+                                <option value="">Todas las asignaturas</option>
+                                {subjectGroups.filter(g => g.name !== 'Sin asignatura').map(g => (
+                                    <option key={g.name} value={g.name}>{g.name}</option>
+                                ))}
+                                <option value="Sin asignatura">Sin asignatura</option>
+                            </select>
+                        </div>
+                        <div className="relative">
+                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <select value={filterTopic} onChange={(e) => setFilterTopic(e.target.value)} className="pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer" disabled={availableTopicsForFilter.length === 0}>
+                                <option value="">Todos los temas</option>
+                                {availableTopicsForFilter.map(t => (
+                                    <option key={t} value={t}>{t}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
