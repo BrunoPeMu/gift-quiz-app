@@ -28,7 +28,7 @@ Para proteger tu cuota de API en producción:
 1.  Ve a [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
 2.  Edita tu API Key.
 3.  En "Restricciones de aplicación", selecciona **Sitios web (HTTP referrers)**.
-4.  Añade tu dominio: `https://generador-de-test-c0035.web.app/*`.
+4.  Añade tu dominio: `https://flashtests.app/*`.
 
 ## 🛠️ Desarrollo Local
 
