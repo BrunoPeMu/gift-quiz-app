@@ -410,18 +410,3 @@ export async function deleteSubject(subjectName: string, userId: string, action:
 
     await batch.commit();
 }
-
-export async function addSubject(name: string, userId: string): Promise<void> {
-    if (!userId || !name.trim()) return;
-    await addDoc(collection(db, SUBJECTS_COLLECTION), {
-        name: name.trim(),
-        userId,
-        createdAt: Date.now()
-    });
-}
-
-export async function getSubjects(userId: string): Promise<string[]> {
-    if (!userId) return [];
-    const snap = await getDocs(query(collection(db, SUBJECTS_COLLECTION), where('userId', '==', userId)));
-    return snap.docs.map(d => d.data().name as string).sort();
-}
