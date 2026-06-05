@@ -5,7 +5,7 @@ Aplicación moderna para generar preguntas de test en formato GIFT usando IA (Go
 ## 🚀 Despliegue (Producción)
 
 La aplicación está desplegada y accesible en:
-**[https://generador-de-test-c0035.web.app](https://generador-de-test-c0035.web.app)**
+**[https://flashtests.app](https://flashtests.app)**
 
 ## 🔐 Seguridad e IA
 
