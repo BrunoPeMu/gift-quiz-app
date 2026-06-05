@@ -4,8 +4,6 @@ import type { Subject } from '../types';
 import { getTopics, getTopicsData } from './questionService';
 
 const COLLECTION = 'subjects';
-const QUESTIONS_COLLECTION = 'questions';
-const TOPICS_COLLECTION = 'topics';
 
 export const getSubjects = async (userId: string): Promise<Subject[]> => {
     if (!userId) return [];
@@ -114,76 +112,4 @@ export const updateSubjectOrder = async (subjects: Subject[]): Promise<void> => 
         console.error('Error updating subject order:', error);
         throw error;
     }
-};
-
-export const renameSubjectWithSync = async (subjectId: string, oldName: string, newName: string, userId: string): Promise<void> => {
-    if (!userId || !newName.trim()) return;
-    const batch = writeBatch(db);
-
-    // Update subject document
-    batch.update(doc(db, COLLECTION, subjectId), { name: newName.trim() });
-
-    // Update questions with this subject
-    const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('userId', '==', userId), where('subject', '==', oldName)));
-    qSnap.docs.forEach(d => batch.update(d.ref, { subject: newName.trim() }));
-
-    // Update topics with this subject
-    const tSnap = await getDocs(query(collection(db, TOPICS_COLLECTION), where('userId', '==', userId), where('subject', '==', oldName)));
-    tSnap.docs.forEach(d => batch.update(d.ref, { subject: newName.trim() }));
-
-    await batch.commit();
-};
-
-export interface SubjectDeleteInfo {
-    topicCount: number;
-    questionCount: number;
-}
-
-export const getSubjectDeleteInfo = async (subjectName: string, userId: string): Promise<SubjectDeleteInfo> => {
-    const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-    const tSnap = await getDocs(query(collection(db, TOPICS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-    return { topicCount: tSnap.size, questionCount: qSnap.size };
-};
-
-export type SubjectDeleteAction = 'reassign' | 'orphan' | 'deleteAll';
-
-export const deleteSubjectWithCleanup = async (
-    subjectId: string,
-    subjectName: string,
-    userId: string,
-    action: SubjectDeleteAction,
-    targetSubject?: string
-): Promise<void> => {
-    if (!userId) return;
-    const batch = writeBatch(db);
-
-    // Delete the subject document
-    batch.delete(doc(db, COLLECTION, subjectId));
-
-    if (action === 'reassign' && targetSubject) {
-        // Update questions subject
-        const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-        qSnap.docs.forEach(d => batch.update(d.ref, { subject: targetSubject }));
-
-        // Update topics subject
-        const tSnap = await getDocs(query(collection(db, TOPICS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-        tSnap.docs.forEach(d => batch.update(d.ref, { subject: targetSubject }));
-    } else if (action === 'orphan') {
-        // Set subject to null/undefined
-        const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-        qSnap.docs.forEach(d => batch.update(d.ref, { subject: null }));
-
-        const tSnap = await getDocs(query(collection(db, TOPICS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-        tSnap.docs.forEach(d => batch.update(d.ref, { subject: null }));
-    } else if (action === 'deleteAll') {
-        // Delete all questions with this subject
-        const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-        qSnap.docs.forEach(d => batch.delete(d.ref));
-
-        // Delete all topics with this subject
-        const tSnap = await getDocs(query(collection(db, TOPICS_COLLECTION), where('userId', '==', userId), where('subject', '==', subjectName)));
-        tSnap.docs.forEach(d => batch.delete(d.ref));
-    }
-
-    await batch.commit();
 };

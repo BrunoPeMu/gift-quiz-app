@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData } from '../services/questionService';
-import { getSubjects, addSubject, renameSubjectWithSync, deleteSubjectWithCleanup, getSubjectDeleteInfo, type SubjectDeleteAction } from '../services/subjectService';
-import type { Subject } from '../types';
 import { parseGIFT } from '../lib/giftParser';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
@@ -41,25 +39,16 @@ export default function ManageContentPage() {
     const [deletingTopic, setDeletingTopic] = useState<{ name: string; subject: string; questionCount: number } | null>(null);
     const [transferTarget, setTransferTarget] = useState('');
     const [deleteAction, setDeleteAction] = useState<'transfer' | 'orphan' | 'deleteQuestions'>('transfer');
-    const [subjectsList, setSubjectsList] = useState<Subject[]>([]);
-    const [editingSubject, setEditingSubject] = useState<{ id: string; oldName: string; newName: string } | null>(null);
-    const [deletingSubject, setDeletingSubject] = useState<{ id: string; name: string; topicCount: number; questionCount: number } | null>(null);
-    const [subjectDeleteAction, setSubjectDeleteAction] = useState<SubjectDeleteAction>('reassign');
-    const [subjectDeleteTarget, setSubjectDeleteTarget] = useState('');
-    const [addingSubject, setAddingSubject] = useState(false);
-    const [newSubjectName, setNewSubjectName] = useState('');
 
     const loadData = async () => {
         if (!currentUser || currentUser.uid === 'guest') return;
 
-        const [allQuestions, topicsData, subjects] = await Promise.all([
+        const [allQuestions, topicsData] = await Promise.all([
             getQuestions(currentUser.uid, undefined, true),
-            getTopicsData(currentUser.uid),
-            getSubjects(currentUser.uid)
+            getTopicsData(currentUser.uid)
         ]);
         setQuestions(allQuestions);
         setAllTopicsData(topicsData);
-        setSubjectsList(subjects);
     };
 
     useEffect(() => {
@@ -229,43 +218,6 @@ export default function ManageContentPage() {
         setExpandedSubjects(newExpanded);
     };
 
-    const handleAddSubject = async () => {
-        if (!currentUser || !newSubjectName.trim()) return;
-        await addSubject(newSubjectName.trim(), currentUser.uid);
-        setNewSubjectName('');
-        setAddingSubject(false);
-        loadData();
-    };
-
-    const handleRenameSubject = async () => {
-        if (!currentUser || !editingSubject) return;
-        const { id, oldName, newName } = editingSubject;
-        if (!newName.trim() || oldName === newName.trim()) {
-            setEditingSubject(null);
-            return;
-        }
-        await renameSubjectWithSync(id, oldName, newName.trim(), currentUser.uid);
-        setEditingSubject(null);
-        loadData();
-    };
-
-    const handleDeleteSubject = async (subject: Subject) => {
-        if (!currentUser) return;
-        const info = await getSubjectDeleteInfo(subject.name, currentUser.uid);
-        setDeletingSubject({ id: subject.id, name: subject.name, ...info });
-        setSubjectDeleteTarget('');
-        setSubjectDeleteAction(info.topicCount > 0 || info.questionCount > 0 ? 'reassign' : 'orphan');
-    };
-
-    const handleConfirmDeleteSubject = async () => {
-        if (!currentUser || !deletingSubject) return;
-        const { id, name } = deletingSubject;
-        await deleteSubjectWithCleanup(id, name, currentUser.uid, subjectDeleteAction, subjectDeleteTarget || undefined);
-        setDeletingSubject(null);
-        setSubjectDeleteTarget('');
-        loadData();
-    };
-
     if (!currentUser || currentUser.uid === 'guest') {
         return (
             <div className="max-w-4xl mx-auto pb-20 pt-4 px-4 sm:px-0">
@@ -388,65 +340,9 @@ export default function ManageContentPage() {
                                 </div>
                             ))
                         )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Delete Subject Modal */}
-                    {deletingSubject && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setDeletingSubject(null)}>
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Eliminar asignatura &ldquo;{deletingSubject.name}&rdquo;</h3>
-                                {(deletingSubject.topicCount > 0 || deletingSubject.questionCount > 0) ? (
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                        Esta asignatura tiene <span className="font-semibold text-slate-700 dark:text-slate-200">{deletingSubject.topicCount} temas</span> y <span className="font-semibold text-slate-700 dark:text-slate-200">{deletingSubject.questionCount} preguntas</span>. ¿Qué quieres hacer?
-                                    </p>
-                                ) : (
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Esta asignatura no tiene temas ni preguntas. ¿Confirmas la eliminación?</p>
-                                )}
-
-                                {(deletingSubject.topicCount > 0 || deletingSubject.questionCount > 0) && (
-                                    <div className="space-y-3 mb-6">
-                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                            <input type="radio" name="subjectDeleteAction" value="reassign" checked={subjectDeleteAction === 'reassign'} onChange={() => setSubjectDeleteAction('reassign')} className="mt-1" />
-                                            <div className="flex-1">
-                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Reasignar a otra asignatura</span>
-                                                {subjectDeleteAction === 'reassign' && (
-                                                    <select value={subjectDeleteTarget} onChange={(e) => setSubjectDeleteTarget(e.target.value)} className="mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm">
-                                                        <option value="">Seleccionar asignatura destino...</option>
-                                                        {subjectsList.filter(s => s.id !== deletingSubject.id).map(s => (
-                                                            <option key={s.id} value={s.name}>{s.name}</option>
-                                                        ))}
-                                                    </select>
-                                                )}
-                                            </div>
-                                        </label>
-                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                            <input type="radio" name="subjectDeleteAction" value="orphan" checked={subjectDeleteAction === 'orphan'} onChange={() => setSubjectDeleteAction('orphan')} className="mt-1" />
-                                            <div>
-                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Dejar sin asignatura</span>
-                                                <p className="text-xs text-slate-400 mt-0.5">Temas y preguntas quedarán sin asignatura</p>
-                                            </div>
-                                        </label>
-                                        <label className="flex items-start gap-3 p-3 rounded-lg border border-red-200 dark:border-red-900/50 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20">
-                                            <input type="radio" name="subjectDeleteAction" value="deleteAll" checked={subjectDeleteAction === 'deleteAll'} onChange={() => setSubjectDeleteAction('deleteAll')} className="mt-1" />
-                                            <div>
-                                                <span className="text-sm font-medium text-red-600 dark:text-red-400">Eliminar todo</span>
-                                                <p className="text-xs text-red-400 mt-0.5">Asignatura, temas y preguntas se eliminarán permanentemente</p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-2 justify-end">
-                                    <button onClick={() => setDeletingSubject(null)} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">Cancelar</button>
-                                    <button onClick={handleConfirmDeleteSubject} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${subjectDeleteAction === 'deleteAll' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-                                        {subjectDeleteAction === 'reassign' ? 'Reasignar y eliminar' : subjectDeleteAction === 'deleteAll' ? 'Eliminar todo' : 'Eliminar asignatura'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    </div>
+                </div>
+            )}
 
             {activeTab === 'subjects' && (
                 <div className="animate-fadeIn">
@@ -454,70 +350,10 @@ export default function ManageContentPage() {
                         <button onClick={loadData} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors" title="Recargar">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         </button>
-                        <div className="flex gap-2">
-                            <button onClick={() => setAddingSubject(true)} className="btn-secondary flex items-center py-2 px-4 rounded-lg text-sm">
-                                <Layers className="w-4 h-4 mr-2" /> Nueva Asignatura
-                            </button>
-                            <button onClick={() => setAddingTopic(true)} className="btn-primary flex items-center py-2 px-4 rounded-lg text-sm">
-                                <Plus className="w-4 h-4 mr-2" /> Nuevo Tema
-                            </button>
-                        </div>
+                        <button onClick={() => setAddingTopic(true)} className="btn-primary flex items-center py-2 px-4 rounded-lg text-sm">
+                            <Plus className="w-4 h-4 mr-2" /> Nuevo Tema
+                        </button>
                     </div>
-
-                    {/* Add Subject Form */}
-                    {addingSubject && (
-                        <div className="mb-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4">
-                            <div className="flex gap-2">
-                                <input type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="Nombre de la asignatura..." className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAddSubject()} />
-                                <button onClick={handleAddSubject} className="p-2 bg-indigo-600 text-white rounded-lg"><Save className="w-4 h-4" /></button>
-                                <button onClick={() => { setAddingSubject(false); setNewSubjectName(''); }} className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg"><X className="w-4 h-4" /></button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Subject List */}
-                    {subjectsList.length > 0 && (
-                        <div className="mb-8">
-                            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Asignaturas</h2>
-                            <div className="space-y-2">
-                                {subjectsList.map(subject => {
-                                    const isEditing = editingSubject?.id === subject.id;
-                                    const groupInfo = subjectGroups.find(g => g.name === subject.name);
-                                    const topicCount = groupInfo?.topics.length || 0;
-                                    const questionCount = groupInfo?.questionCount || 0;
-
-                                    return (
-                                        <div key={subject.id} className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3">
-                                            <FolderOpen className="w-5 h-5 text-indigo-500 mr-3 flex-shrink-0" />
-                                            {isEditing ? (
-                                                <div className="flex-1 flex gap-2 items-center">
-                                                    <input type="text" value={editingSubject.newName} onChange={(e) => setEditingSubject({ ...editingSubject, newName: e.target.value })} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm" autoFocus />
-                                                    <button onClick={handleRenameSubject} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"><Save className="w-4 h-4" /></button>
-                                                    <button onClick={() => setEditingSubject(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <span className="flex-1 text-sm font-semibold text-slate-900 dark:text-white">{subject.name}</span>
-                                                    <span className="text-xs text-slate-400 mr-3">{topicCount} temas · {questionCount} preguntas</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <button onClick={() => setEditingSubject({ id: subject.id, oldName: subject.name, newName: subject.name })} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg" title="Renombrar">
-                                                            <Edit2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button onClick={() => handleDeleteSubject(subject)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Eliminar">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Divider */}
-                    <div className="border-t border-slate-200 dark:border-slate-700 my-6"></div>
 
                     {/* Add Topic Form */}
                     {addingTopic && (
