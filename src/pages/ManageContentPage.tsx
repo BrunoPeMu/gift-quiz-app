@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData, renameSubject, deleteSubject } from '../services/questionService';
+import { getQuestions, updateQuestion, deleteTopic, deleteQuestion, renameTopicDirect, updateTopicSubject, addTopic, getTopicsData, renameSubject, deleteSubject, addSubject, getSubjects } from '../services/questionService';
 import { parseGIFT } from '../lib/giftParser';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
@@ -34,6 +34,9 @@ export default function ManageContentPage() {
     const [deletingSubject, setDeletingSubject] = useState<{ name: string; topicCount: number; questionCount: number } | null>(null);
     const [subjectDeleteAction, setSubjectDeleteAction] = useState<'transfer' | 'orphan' | 'deleteAll'>('transfer');
     const [subjectDeleteTarget, setSubjectDeleteTarget] = useState('');
+    const [addingSubject, setAddingSubject] = useState(false);
+    const [newSubjectName, setNewSubjectName] = useState('');
+    const [subjectNames, setSubjectNames] = useState<string[]>([]);
     const [addingTopic, setAddingTopic] = useState(false);
     const [newTopicName, setNewTopicName] = useState('');
     const [newTopicSubject, setNewTopicSubject] = useState('');
@@ -47,12 +50,14 @@ export default function ManageContentPage() {
     const loadData = async () => {
         if (!currentUser || currentUser.uid === 'guest') return;
 
-        const [allQuestions, topicsData] = await Promise.all([
+        const [allQuestions, topicsData, subjects] = await Promise.all([
             getQuestions(currentUser.uid, undefined, true),
-            getTopicsData(currentUser.uid)
+            getTopicsData(currentUser.uid),
+            getSubjects(currentUser.uid)
         ]);
         setQuestions(allQuestions);
         setAllTopicsData(topicsData);
+        setSubjectNames(subjects);
     };
 
     useEffect(() => {
@@ -82,6 +87,11 @@ export default function ManageContentPage() {
             g.questionCount++;
         });
 
+        // Include manually created subjects (even without topics/questions)
+        subjectNames.forEach(name => {
+            getGroup(name);
+        });
+
         // Convert to array
         const result: SubjectGroup[] = [];
         Object.entries(groups)
@@ -96,7 +106,7 @@ export default function ManageContentPage() {
         }
 
         return result;
-    }, [questions, allTopicsData]);
+    }, [questions, allTopicsData, subjectNames]);
 
     // Available topics for the topic filter (depends on selected subject)
     const availableTopicsForFilter = useMemo(() => {
@@ -211,6 +221,14 @@ export default function ManageContentPage() {
         await deleteSubject(deletingSubject.name, currentUser.uid, subjectDeleteAction, subjectDeleteTarget || undefined);
         setDeletingSubject(null);
         setSubjectDeleteTarget('');
+        loadData();
+    };
+
+    const handleAddSubject = async () => {
+        if (!currentUser || !newSubjectName.trim()) return;
+        await addSubject(newSubjectName.trim(), currentUser.uid);
+        setNewSubjectName('');
+        setAddingSubject(false);
         loadData();
     };
 
@@ -383,9 +401,14 @@ export default function ManageContentPage() {
                         <button onClick={loadData} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors" title="Recargar">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         </button>
-                        <button onClick={() => setAddingTopic(true)} className="btn-primary flex items-center py-2 px-4 rounded-lg text-sm">
-                            <Plus className="w-4 h-4 mr-2" /> Nuevo Tema
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={() => setAddingSubject(true)} className="btn-secondary flex items-center py-2 px-4 rounded-lg text-sm">
+                                <Layers className="w-4 h-4 mr-2" /> Nueva Asignatura
+                            </button>
+                            <button onClick={() => setAddingTopic(true)} className="btn-primary flex items-center py-2 px-4 rounded-lg text-sm">
+                                <Plus className="w-4 h-4 mr-2" /> Nuevo Tema
+                            </button>
+                        </div>
                     </div>
 
                     {/* Add Topic Form */}
@@ -399,6 +422,17 @@ export default function ManageContentPage() {
                                 </select>
                                 <button onClick={handleAddTopic} className="p-2 bg-indigo-600 text-white rounded-lg"><Save className="w-4 h-4" /></button>
                                 <button onClick={() => { setAddingTopic(false); setNewTopicName(''); setNewTopicSubject(''); }} className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg"><X className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Subject Form */}
+                    {addingSubject && (
+                        <div className="mb-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4">
+                            <div className="flex gap-2">
+                                <input type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="Nombre de la asignatura..." className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAddSubject()} />
+                                <button onClick={handleAddSubject} className="p-2 bg-indigo-600 text-white rounded-lg"><Save className="w-4 h-4" /></button>
+                                <button onClick={() => { setAddingSubject(false); setNewSubjectName(''); }} className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg"><X className="w-4 h-4" /></button>
                             </div>
                         </div>
                     )}
