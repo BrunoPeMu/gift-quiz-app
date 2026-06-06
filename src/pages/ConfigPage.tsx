@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Save, Crown, Trash2, Share2, Copy, Check, BarChart2, Hash, Shuffle, ListOrdered, BrainCircuit, RotateCcw, LayoutGrid, BookOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { getSubjects, syncSubjects, getSubjectNames } from '../services/subjectService';
 import { getQuestions, getTopicsData } from '../services/questionService';
-import { getLocalUserId, type TopicStats } from '../services/progressService';
+import { getLocalUserId } from '../services/progressService';
 import { shareQuiz } from '../services/shareService';
 import { selectQuestions } from '../lib/quizEngine';
-import type { QuizConfig, Question } from '../types';
+import type { QuizConfig } from '../types';
 
 export default function ConfigPage() {
     const navigate = useNavigate();
@@ -40,12 +39,7 @@ export default function ConfigPage() {
             try {
                 const userId = userProfile?.uid || getLocalUserId();
 
-                await syncSubjects(userId);
-
-                const [subjects, topicsData] = await Promise.all([
-                    getSubjects(userId),
-                    getTopicsData(userId)
-                ]);
+                const topicsData = await getTopicsData(userId);
 
                 // Build topic -> subject map
                 const subjectMap: Record<string, string> = {};
@@ -54,44 +48,28 @@ export default function ConfigPage() {
                 });
                 setTopicSubjectMap(subjectMap);
 
-                // Get unique subject names
-                const names = await getSubjectNames(userId);
+                // Derive unique subject names from topics data
+                const subjects = new Set<string>();
+                topicsData.forEach(t => {
+                    if (t.subject && t.subject !== 'Uncategorized') {
+                        subjects.add(t.subject);
+                    }
+                });
+                const names = Array.from(subjects).sort();
                 if (names.length > 0) {
                     setSubjectNames(['All', ...names]);
                 } else {
                     setSubjectNames(['All']);
                 }
 
-                // Filter active subjects and map to names
-                let activeTopics = subjects.filter(s => s.isActive).map(s => s.name);
-
-                // Fallback: if no subjects, use topics from the topics collection
-                if (activeTopics.length === 0 && topicsData.length > 0) {
-                    activeTopics = topicsData.map(t => t.name);
-                }
-
+                // Get all topic names from topics data
+                const activeTopics = topicsData.map(t => t.name);
                 if (activeTopics.length > 0) setTopics(['All', ...activeTopics]);
                 else setTopics(['All', 'General']);
 
                 // Load questions for availability
                 const questions = await getQuestions(userId);
 
-                // Calculate stats (simplified for availability check)
-                const statsMap = new Map<string, TopicStats>();
-                activeTopics.forEach(topic => {
-                    statsMap.set(topic, {
-                        topic,
-                        totalAttempts: 0,
-                        correctAttempts: 0,
-                        byDifficulty: {
-                            easy: { total: 0, correct: 0 },
-                            medium: { total: 0, correct: 0 },
-                            hard: { total: 0, correct: 0 }
-                        }
-                    });
-                });
-
-                const qMap = new Map<string, Question>();
                 const avail: Record<string, Record<string, number>> = {};
 
                 // Initialize availability for all topics
@@ -100,8 +78,6 @@ export default function ConfigPage() {
                 });
 
                 questions.forEach(q => {
-                    qMap.set(q.id, q);
-
                     // Count for specific topic
                     if (!avail[q.topic]) avail[q.topic] = { easy: 0, medium: 0, hard: 0 };
                     if (avail[q.topic][q.difficulty] !== undefined) {
