@@ -8,13 +8,22 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors duration-200">
-            <Navbar />
-            <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
-                {children}
-            </main>
-            <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
-                <AdBanner />
+        <div className="min-h-screen flex flex-col relative overflow-hidden text-slate-100">
+            {/* Ambient Glow (Aurora Effects) */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/15 blur-[120px] rounded-full mix-blend-screen"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-600/15 blur-[140px] rounded-full mix-blend-screen"></div>
+                <div className="absolute top-[30%] right-[10%] w-[40%] h-[40%] bg-amber-500/10 blur-[100px] rounded-full mix-blend-screen"></div>
+            </div>
+
+            <div className="relative z-10 flex flex-col flex-grow w-full">
+                <Navbar />
+                <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+                    {children}
+                </main>
+                <div className="max-w-[1800px] mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
+                    <AdBanner />
+                </div>
             </div>
         </div>
     );

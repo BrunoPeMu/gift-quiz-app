@@ -130,16 +130,25 @@ export default function QuizPage() {
 
     return (
         <div className="max-w-3xl mx-auto">
-            <div className="mb-6 flex justify-between items-center">
-                <span className="text-sm font-medium text-slate-500">
-                    {t('quiz.question')} {state.currentIndex + 1} {t('quiz.of')} {state.questions.length}
-                </span>
-                <span className="text-sm font-medium text-indigo-600">
-                    {t('quiz.score')}: {state.score}
-                </span>
+            <div className="mb-6 flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold text-slate-300">
+                        {t('quiz.question')} {state.currentIndex + 1} {t('quiz.of')} {state.questions.length}
+                    </span>
+                    <span className="text-sm font-bold text-amber-500">
+                        {t('quiz.score')}: {state.score}
+                    </span>
+                </div>
+                {/* Sleek Energy Progress Bar */}
+                <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                        className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500 ease-out"
+                        style={{ width: `${((state.currentIndex) / state.questions.length) * 100}%` }}
+                    />
+                </div>
             </div>
 
-            <div className="card p-8 shadow-lg min-h-[400px] flex flex-col relative">
+            <div className="card p-8 min-h-[400px] flex flex-col relative">
                 <button
                     onClick={handleReport}
                     className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors"
@@ -157,13 +166,13 @@ export default function QuizPage() {
                                 key={idx}
                                 onClick={() => !hasAnswered && handleAnswer(cleanOpt)}
                                 disabled={hasAnswered}
-                                className={`w-full text-left p-4 rounded-md border transition-all ${hasAnswered
+                                className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 ${hasAnswered
                                     ? cleanOpt === String(currentQ.answer).split('#')[0].trim()
-                                        ? 'bg-green-50 dark:bg-green-900/30 border-green-500 text-green-800 dark:text-green-300'
+                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                                         : state.answers[currentQ.id] === cleanOpt
-                                            ? 'bg-red-50 dark:bg-red-900/30 border-red-500 text-red-800 dark:text-red-300'
-                                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-50'
-                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-200'}`}
+                                            ? 'bg-red-500/20 border-red-500 text-red-300'
+                                            : 'bg-slate-900/60 border-white/5 opacity-40'
+                                    : 'bg-slate-900/60 border-white/5 text-slate-300 hover:scale-[1.01] hover:border-purple-500/50 hover:bg-purple-500/10'}`}
                             >
                                 {cleanOpt}
                             </button>
@@ -177,13 +186,13 @@ export default function QuizPage() {
                                     key={opt}
                                     onClick={() => !hasAnswered && handleAnswer(opt === 'True')}
                                     disabled={hasAnswered}
-                                    className={`p-4 rounded-md border text-center font-medium transition-all ${hasAnswered
+                                    className={`p-4 rounded-2xl border text-center font-medium transition-all duration-300 ${hasAnswered
                                         ? (opt === 'True') === currentQ.answer
-                                            ? 'bg-green-50 dark:bg-green-900/30 border-green-500 text-green-800 dark:text-green-300'
+                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                                             : state.answers[currentQ.id] === (opt === 'True')
-                                                ? 'bg-red-50 dark:bg-red-900/30 border-red-500 text-red-800 dark:text-red-300'
-                                                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-50'
-                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-200'}`}
+                                                ? 'bg-red-500/20 border-red-500 text-red-300'
+                                                : 'bg-slate-900/60 border-white/5 opacity-40'
+                                        : 'bg-slate-900/60 border-white/5 text-slate-300 hover:scale-[1.01] hover:border-purple-500/50 hover:bg-purple-500/10'}`}
                                 >
                                     {opt}
                                 </button>
@@ -208,13 +217,13 @@ export default function QuizPage() {
                                     onChange={(e) => setShortAnswerText(e.target.value)}
                                     disabled={hasAnswered}
                                     placeholder={t('quiz.typeAnswer', { defaultValue: 'Type your answer here...' })}
-                                    className={`flex-grow rounded-md border shadow-sm p-3 dark:bg-slate-700 dark:text-white transition-colors ${hasAnswered
+                                    className={`flex-grow rounded-2xl border shadow-sm p-3 bg-slate-900/60 text-white transition-all duration-300 outline-none ${hasAnswered
                                         ? (Array.isArray(currentQ.answer)
                                             ? currentQ.answer.some(a => String(a).toLowerCase() === String(state.answers[currentQ.id]).toLowerCase())
                                             : String(currentQ.answer).toLowerCase() === String(state.answers[currentQ.id]).toLowerCase())
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-300'
-                                            : 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-900 dark:text-red-300'
-                                        : 'border-slate-300 dark:border-slate-600 focus:border-indigo-500 focus:ring-indigo-500'
+                                            ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                                            : 'border-red-500 bg-red-500/20 text-red-300'
+                                        : 'border-white/5 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50'
                                         } `}
                                 />
                                 <button
@@ -237,11 +246,11 @@ export default function QuizPage() {
 
                 {
                     showFeedback && currentQ.feedback && (
-                        <div className={`mt-4 p-4 rounded-md border ${(Array.isArray(currentQ.answer)
+                        <div className={`mt-4 p-4 rounded-2xl border ${(Array.isArray(currentQ.answer)
                             ? currentQ.answer.some(a => String(a).toLowerCase() === String(state.answers[currentQ.id]).toLowerCase())
                             : String(currentQ.answer).toLowerCase() === String(state.answers[currentQ.id]).toLowerCase())
-                            ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
-                            : 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300'
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                            : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                             } `}>
                             <p className="font-medium">{t('quiz.feedback')}:</p>
                             <p>{currentQ.feedback}</p>

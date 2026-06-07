@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Trophy, TrendingUp, Play, User, Plus, Edit2, Check, X, AlertCircle, Crown, Share, Lightbulb } from 'lucide-react';
+import { BookOpen, Trophy, TrendingUp, Play, User, Plus, Edit2, Check, X, AlertCircle, Crown, Share, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProgress, type TopicStats } from '../services/progressService';
 import { getTopicsData, getQuestions, addTopic, renameTopic as renameTopicService, migrateLegacyData } from '../services/questionService';
@@ -52,6 +52,7 @@ export default function DashboardPage() {
     const [topicStats, setTopicStats] = useState<TopicStats[]>([]);
     const [allQuestions, setAllQuestions] = useState<Question[]>([]);
     const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+    const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         loadData();
@@ -199,14 +200,24 @@ export default function DashboardPage() {
         });
     };
 
-    const toggleTopic = (topic: string) => {
+    const toggleTopic = (topicName: string) => {
         const newExpanded = new Set(expandedTopics);
-        if (newExpanded.has(topic)) {
-            newExpanded.delete(topic);
+        if (newExpanded.has(topicName)) {
+            newExpanded.delete(topicName);
         } else {
-            newExpanded.add(topic);
+            newExpanded.add(topicName);
         }
         setExpandedTopics(newExpanded);
+    };
+
+    const toggleSubject = (subjectName: string) => {
+        const newCollapsed = new Set(collapsedSubjects);
+        if (newCollapsed.has(subjectName)) {
+            newCollapsed.delete(subjectName);
+        } else {
+            newCollapsed.add(subjectName);
+        }
+        setCollapsedSubjects(newCollapsed);
     };
 
     const handleAddTopic = async () => {
@@ -279,7 +290,7 @@ export default function DashboardPage() {
     // ... (keep existing effects and loadData)
 
     return (
-        <div className="max-w-2xl mx-auto pb-20 pt-4 px-4 sm:px-0">
+        <div className="w-full mx-auto pb-20 pt-4 px-4 sm:px-0">
             {/* Error Message */}
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 flex items-center mb-6">
@@ -333,35 +344,35 @@ export default function DashboardPage() {
                         <div className="w-full overflow-x-auto hide-scrollbar mb-6">
                             <div className="flex space-x-4 min-w-max pb-2 px-1">
                                 {/* Tests Taken */}
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center space-x-3 min-w-[160px]">
-                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+                                <div className="card p-4 flex items-center space-x-3 min-w-[160px]">
+                                    <div className="p-2 bg-blue-500/20 text-blue-300 rounded-lg">
                                         <BookOpen className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Tests Completados</p>
-                                        <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.totalQuizzes}</p>
+                                        <p className="text-xs text-slate-400 font-medium">Tests Completados</p>
+                                        <p className="text-xl font-bold text-white">{stats.totalQuizzes}</p>
                                     </div>
                                 </div>
 
                                 {/* Average Score */}
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center space-x-3 min-w-[160px]">
-                                    <div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg">
+                                <div className="card p-4 flex items-center space-x-3 min-w-[160px]">
+                                    <div className="p-2 bg-emerald-500/20 text-emerald-300 rounded-lg">
                                         <Trophy className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Nota Media</p>
-                                        <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.averageScore}%</p>
+                                        <p className="text-xs text-slate-400 font-medium">Nota Media</p>
+                                        <p className="text-xl font-bold text-white">{stats.averageScore}%</p>
                                     </div>
                                 </div>
 
                                 {/* Topics Mastered */}
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center space-x-3 min-w-[160px]">
-                                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
+                                <div className="card p-4 flex items-center space-x-3 min-w-[160px]">
+                                    <div className="p-2 bg-purple-500/20 text-purple-300 rounded-lg">
                                         <TrendingUp className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Temas Dominados</p>
-                                        <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.topicsMastered}</p>
+                                        <p className="text-xs text-slate-400 font-medium">Temas Dominados</p>
+                                        <p className="text-xl font-bold text-white">{stats.topicsMastered}</p>
                                     </div>
                                 </div>
                             </div>
@@ -575,171 +586,193 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         /* Logged In User View: Topics Grid */
-                        <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-                            {Object.entries(topicsBySubject).map(([subject, topics]) => (
-                                <div key={subject} className="break-inside-avoid bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow mb-4">
-                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                                        <h3 className="font-bold text-slate-900 dark:text-white truncate" title={subject}>
-                                            {subject}
-                                        </h3>
-                                        <span className="text-xs font-semibold px-2 py-1 bg-slate-200 dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300">
-                                            {topics.length}
-                                        </span>
-                                    </div>
-                                    <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                                        {topics.map(topic => {
-                                            const isExpanded = expandedTopics.has(topic.topic);
-                                            const generalPercentage = topic.totalAttempts > 0 ? (topic.correctAttempts / topic.totalAttempts) : 0;
-
-                                            const handleSaveRename = async () => {
-                                                if (!currentUser || currentUser.uid === 'guest') return;
-                                                if (tempTopicName.trim() && tempTopicName !== topic.topic) {
-                                                    await renameTopicService(topic.topic, topic.subject || '', tempTopicName.trim(), currentUser.uid);
-                                                }
-                                                // Assuming subject update is handled elsewhere or not part of this specific rename
-                                                setEditingTopicId(null);
-                                                loadData();
-                                            };
-
-                                            const cancelRename = () => {
-                                                setEditingTopicId(null);
-                                                setTempTopicName('');
-                                            };
-
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                            {[0, 1, 2, 3].map((colIndex) => (
+                                <div key={colIndex} className="flex flex-col gap-4">
+                                    {Object.entries(topicsBySubject)
+                                        .filter((_, idx) => idx % 4 === colIndex)
+                                        .map(([subject, topics]) => {
+                                            const isSubjectCollapsed = collapsedSubjects.has(subject);
                                             return (
-                                                <div key={topic.topic} className="group p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                                    <div
-                                                        className="flex items-center justify-between cursor-pointer"
-                                                        onClick={() => toggleTopic(topic.topic)}
-                                                    >
-                                                        <div className="flex-1 min-w-0 pr-2">
-                                                            {editingTopicId === topic.topic ? (
-                                                                <div className="flex items-center space-x-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={tempTopicName}
-                                                                        onChange={(e) => setTempTopicName(e.target.value)}
-                                                                        className="flex-1 px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                                                                        autoFocus
-                                                                        onClick={(e) => e.stopPropagation()} // Prevent toggleTopic from firing
-                                                                        onKeyDown={(e) => {
-                                                                            if (e.key === 'Enter') handleSaveRename();
-                                                                            if (e.key === 'Escape') cancelRename();
-                                                                        }}
-                                                                    />
-                                                                    <button onClick={(e) => { e.stopPropagation(); handleSaveRename(); }} className="p-1 text-green-600 hover:bg-green-50 rounded">
-                                                                        <Check className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button onClick={(e) => { e.stopPropagation(); cancelRename(); }} className="p-1 text-red-600 hover:bg-red-50 rounded">
-                                                                        <X className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate">{topic.topic}</div>
-                                                            )}
-                                                            <span className="text-xs text-slate-400">{topic.questionCount || 0} q</span>
-                                                        </div>
-
-                                                        <div className="flex items-center space-x-2">
-                                                            <div
-                                                                className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${generalPercentage > 0.8 ? 'border-green-500 text-green-600' :
-                                                                    generalPercentage > 0.5 ? 'border-yellow-500 text-yellow-600' :
-                                                                        'border-slate-200 text-slate-400'
-                                                                    }`}
-                                                            >
-                                                                {Math.round(generalPercentage * 100)}
-                                                            </div>
-                                                            <Play
-                                                                onClick={(e) => { e.stopPropagation(); handleQuickStart(topic.topic); }}
-                                                                className="w-4 h-4 text-slate-400 hover:text-indigo-500"
-                                                            />
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setEditingTopicId(topic.topic);
-                                                                    setTempTopicName(topic.topic);
-                                                                }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-all"
-                                                                title={t('common.edit')}
-                                                            >
-                                                                <Edit2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
+                                            <div key={subject} className="card overflow-hidden w-full">
+                                                <div 
+                                                    className="p-4 border-b border-white/5 flex justify-between items-center bg-slate-900/40 cursor-pointer hover:bg-slate-800/60 transition-colors"
+                                                    onClick={() => toggleSubject(subject)}
+                                                >
+                                                    <div className="flex items-center space-x-2 overflow-hidden pr-2">
+                                                        {isSubjectCollapsed ? (
+                                                            <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                                        ) : (
+                                                            <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                                        )}
+                                                        <h3 className="font-bold text-white truncate" title={subject}>
+                                                            {subject}
+                                                        </h3>
                                                     </div>
-
-                                                    {/* Expanded Details */}
-                                                    {isExpanded && (
-                                                        <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700">
-                                                            <div className="flex justify-between items-center mb-2">
-                                                                <span className="text-[10px] uppercase text-slate-400 font-bold">Details</span>
-                                                                <div className="flex space-x-3">
-                                                                    <Edit2 onClick={() => { setEditingTopicId(topic.topic); setTempTopicName(topic.topic); }} className="w-3 h-3 text-slate-400 hover:text-blue-500 cursor-pointer" />
-                                                                    <Share className="w-3 h-3 text-slate-400 hover:text-blue-500 cursor-pointer" />
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-3 gap-1">
-                                                                {Object.entries(topic.byDifficulty).map(([diff, d]: [string, any]) => (
-                                                                    <div key={diff} className="text-center bg-white dark:bg-slate-800 rounded p-1">
-                                                                        <div className="text-[10px] text-slate-500">{diff[0].toUpperCase()}</div>
-                                                                        <div className="text-xs font-mono">{d.correct}/{d.total}</div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                    <span className="text-xs font-semibold px-2 py-1 bg-slate-700 rounded-full text-slate-300 flex-shrink-0">
+                                                        {topics.length}
+                                                    </span>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+                                                
+                                                {!isSubjectCollapsed && (
+                                                <div className="divide-y divide-white/5">
+                                                    {topics.map(topic => {
+                                                        const isExpanded = expandedTopics.has(topic.topic);
+                                                        const generalPercentage = topic.totalAttempts > 0 ? (topic.correctAttempts / topic.totalAttempts) : 0;
+
+                                                        const handleSaveRename = async () => {
+                                                            if (!currentUser || currentUser.uid === 'guest') return;
+                                                            if (tempTopicName.trim() && tempTopicName !== topic.topic) {
+                                                                await renameTopicService(topic.topic, topic.subject || '', tempTopicName.trim(), currentUser.uid);
+                                                            }
+                                                            setEditingTopicId(null);
+                                                            loadData();
+                                                        };
+
+                                                        const cancelRename = () => {
+                                                            setEditingTopicId(null);
+                                                            setTempTopicName('');
+                                                        };
+
+                                                        return (
+                                                            <div key={topic.topic} className="group p-3 hover:bg-white/5 transition-colors">
+                                                                <div
+                                                                    className="flex items-center justify-between cursor-pointer"
+                                                                    onClick={() => toggleTopic(topic.topic)}
+                                                                >
+                                                                    <div className="flex-1 min-w-0 pr-2">
+                                                                        {editingTopicId === topic.topic ? (
+                                                                            <div className="flex items-center space-x-2">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={tempTopicName}
+                                                                                    onChange={(e) => setTempTopicName(e.target.value)}
+                                                                                    className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-white focus:ring-2 focus:ring-purple-500"
+                                                                                    autoFocus
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') handleSaveRename();
+                                                                                        if (e.key === 'Escape') cancelRename();
+                                                                                    }}
+                                                                                />
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleSaveRename(); }} className="p-1 text-green-400 hover:bg-green-400/10 rounded">
+                                                                                    <Check className="w-4 h-4" />
+                                                                                </button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); cancelRename(); }} className="p-1 text-red-400 hover:bg-red-400/10 rounded">
+                                                                                    <X className="w-4 h-4" />
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="font-medium text-sm text-slate-200 truncate">{topic.topic}</div>
+                                                                        )}
+                                                                        <span className="text-xs text-slate-400">{topic.questionCount || 0} q</span>
+                                                                    </div>
+
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <div
+                                                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${generalPercentage > 0.8 ? 'border-green-500 text-green-500' :
+                                                                                generalPercentage > 0.5 ? 'border-yellow-500 text-yellow-500' :
+                                                                                    'border-slate-600 text-slate-400'
+                                                                                }`}
+                                                                        >
+                                                                            {Math.round(generalPercentage * 100)}
+                                                                        </div>
+                                                                        <Play
+                                                                            onClick={(e) => { e.stopPropagation(); handleQuickStart(topic.topic); }}
+                                                                            className="w-4 h-4 text-slate-400 hover:text-purple-400"
+                                                                        />
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setEditingTopicId(topic.topic);
+                                                                                setTempTopicName(topic.topic);
+                                                                            }}
+                                                                            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded-full transition-all"
+                                                                            title={t('common.edit')}
+                                                                        >
+                                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Expanded Details */}
+                                                                {isExpanded && (
+                                                                    <div className="mt-2 px-3 py-2 bg-slate-900/50 rounded-lg border border-white/5">
+                                                                        <div className="flex justify-between items-center mb-2">
+                                                                            <span className="text-[10px] uppercase text-slate-400 font-bold">Details</span>
+                                                                            <div className="flex space-x-3">
+                                                                                <Edit2 onClick={() => { setEditingTopicId(topic.topic); setTempTopicName(topic.topic); }} className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
+                                                                                <Share className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-3 gap-1">
+                                                                            {Object.entries(topic.byDifficulty).map(([diff, d]: [string, any]) => (
+                                                                                <div key={diff} className="text-center bg-slate-800/50 rounded p-1">
+                                                                                    <div className="text-[10px] text-slate-400">{diff[0].toUpperCase()}</div>
+                                                                                    <div className="text-xs font-mono text-slate-300">{d.correct}/{d.total}</div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                )}
+                                            </div>
+                                        );
+                                        })
+                                    }
                                 </div>
                             ))}
                         </div>
                     )}
 
                     {/* Success Tips Section (Visible to ALL users) */}
-                    <div className="mt-12">
+                    <div className="mt-12 clear-both">
                         <div className="flex items-center space-x-2 mb-6">
-                            <Lightbulb className="w-6 h-6 text-yellow-500" />
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                            <Lightbulb className="w-6 h-6 text-amber-500" />
+                            <h3 className="text-xl font-bold text-white">
                                 Consejos para el Éxito
                             </h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Spaced Repetition */}
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="bg-blue-50 dark:bg-blue-900/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-blue-600 dark:text-blue-400">
+                            <div className="card p-6 relative overflow-hidden">
+                                <div className="bg-emerald-500/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-emerald-400">
                                     <TrendingUp className="w-6 h-6" />
                                 </div>
-                                <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-2">
+                                <h4 className="font-bold text-lg text-white mb-2">
                                     Repetición Espaciada
                                 </h4>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                <p className="text-slate-400 text-sm leading-relaxed">
                                     Repasar el material en intervalos crecientes mejora drásticamente la retención a largo plazo.
                                 </p>
                             </div>
 
                             {/* Active Recall */}
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="bg-indigo-50 dark:bg-indigo-900/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-indigo-600 dark:text-indigo-400">
+                            <div className="card p-6 relative overflow-hidden">
+                                <div className="bg-purple-500/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-purple-400">
                                     <Lightbulb className="w-6 h-6" />
                                 </div>
-                                <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-2">
+                                <h4 className="font-bold text-lg text-white mb-2">
                                     Recuerdo Activo
                                 </h4>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                <p className="text-slate-400 text-sm leading-relaxed">
                                     Ponerte a prueba es más efectivo que releer. ¡Desafía a tu cerebro!
                                 </p>
                             </div>
 
                             {/* Interleaved Practice */}
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="bg-purple-50 dark:bg-purple-900/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-purple-600 dark:text-purple-400">
+                            <div className="card p-6 relative overflow-hidden">
+                                <div className="bg-amber-500/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-amber-400">
                                     <BookOpen className="w-6 h-6" />
                                 </div>
-                                <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-2">
+                                <h4 className="font-bold text-lg text-white mb-2">
                                     Práctica Intercalada
                                 </h4>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                <p className="text-slate-400 text-sm leading-relaxed">
                                     Mezclar diferentes temas mejora tu capacidad para resolver problemas en cualquier contexto.
                                 </p>
                             </div>
@@ -754,14 +787,14 @@ export default function DashboardPage() {
                     <AdBanner />
 
                     {/* Rewarded Video CTA */}
-                    <div className="mt-6 bg-slate-100 dark:bg-slate-800 rounded-xl p-4 flex items-center justify-between border border-dashed border-slate-300 dark:border-slate-700">
+                    <div className="mt-6 card p-4 flex items-center justify-between border-dashed">
                         <div className="flex items-center space-x-3">
-                            <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg text-indigo-600 dark:text-indigo-400">
+                            <div className="bg-amber-500/20 p-2 rounded-lg text-amber-400">
                                 <Play className="w-5 h-5" />
                             </div>
                             <div>
-                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{t('ad.watchTitle', { defaultValue: 'Need more credits?' })}</h4>
-                                <p className="text-xs text-slate-500">{t('ad.watchDesc', { defaultValue: 'Watch a short video to get +1 credit' })}</p>
+                                <h4 className="font-bold text-white text-sm">{t('ad.watchTitle', { defaultValue: 'Need more credits?' })}</h4>
+                                <p className="text-xs text-slate-400">{t('ad.watchDesc', { defaultValue: 'Watch a short video to get +1 credit' })}</p>
                             </div>
                         </div>
                         <button

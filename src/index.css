@@ -2,46 +2,50 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-sans: "Outfit", sans-serif;
+}
+
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-50;
+    @apply bg-slate-950 text-slate-100 antialiased font-sans overflow-x-hidden;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700;
+    @apply bg-slate-900/40 backdrop-blur-xl rounded-3xl border border-white/10 shadow-xl shadow-black/20 relative overflow-hidden;
   }
 
   .input-field {
-    @apply w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border;
+    @apply w-full rounded-2xl border border-white/5 bg-slate-900/60 text-slate-300 shadow-sm focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 sm:text-sm p-3 transition-all duration-300 outline-none;
   }
 
   .btn-primary {
-    @apply bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-slate-900;
+    @apply bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold px-6 py-3 rounded-2xl hover:scale-[1.02] shadow-lg shadow-orange-500/20 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 focus:ring-offset-slate-950;
   }
 
   .btn-secondary {
-    @apply bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md px-4 py-2 transition-colors;
+    @apply bg-slate-900/60 text-slate-300 border border-white/5 hover:bg-purple-500/10 hover:border-purple-500/50 hover:scale-[1.01] rounded-2xl px-6 py-3 transition-all duration-300;
   }
 
   .heading-1 {
-    @apply text-2xl font-bold text-slate-900 dark:text-white;
+    @apply text-3xl font-extrabold text-white tracking-tight;
   }
 
   .heading-2 {
-    @apply text-xl font-bold text-slate-900 dark:text-white;
+    @apply text-2xl font-bold text-white tracking-tight;
   }
 
   .text-body {
-    @apply text-slate-600 dark:text-slate-300;
+    @apply text-slate-300;
   }
 
   .text-muted {
-    @apply text-slate-500 dark:text-slate-400;
+    @apply text-slate-400;
   }
 
   .badge-indigo {
-    @apply bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400;
+    @apply bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider;
   }
 }

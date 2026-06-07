@@ -29,8 +29,8 @@ export function Navbar() {
     };
 
     return (
-        <nav className="bg-white border-b border-slate-200 shadow-sm relative z-50">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav className="bg-slate-900/40 backdrop-blur-xl border-b border-white/10 shadow-sm relative z-50">
+            <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
                     <div className="flex">
                         <div className="flex-shrink-0 flex items-center">
@@ -47,8 +47,8 @@ export function Navbar() {
                                         className={cn(
                                             'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors',
                                             isActive
-                                                ? 'border-indigo-500 text-gray-900'
-                                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                                ? 'border-indigo-500 text-white'
+                                                : 'border-transparent text-slate-400 hover:border-slate-300 hover:text-slate-200'
                                         )}
                                     >
                                         <Icon className="w-4 h-4 mr-2" />

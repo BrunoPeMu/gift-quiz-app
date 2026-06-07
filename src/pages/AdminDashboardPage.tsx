@@ -65,8 +65,8 @@ export default function AdminDashboardPage() {
     return (
         <div className="max-w-6xl mx-auto p-6">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-                    <Shield className="w-8 h-8 text-indigo-600" />
+                <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+                    <Shield className="w-8 h-8 text-purple-500" />
                     Admin Dashboard
                     <button
                         onClick={loadUsers}
@@ -81,7 +81,7 @@ export default function AdminDashboardPage() {
                     <input
                         type="text"
                         placeholder="Search users..."
-                        className="pl-10 pr-4 py-2 border rounded-md"
+                        className="input-field pl-10"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -91,17 +91,17 @@ export default function AdminDashboardPage() {
             {loading ? (
                 <div className="text-center py-8">Loading users...</div>
             ) : (
-                <div className="bg-white rounded-lg shadow overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200">
-                        <thead className="bg-slate-50">
+                <div className="card overflow-x-auto">
+                    <table className="min-w-full divide-y divide-white/10">
+                        <thead className="bg-slate-900/60 border-b border-white/10">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">User</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">User</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Role</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-slate-200">
+                        <tbody className="divide-y divide-white/5">
                             {filteredUsers.map((user) => (
                                 <tr key={user.uid}>
                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -116,29 +116,29 @@ export default function AdminDashboardPage() {
                                                 )}
                                             </div>
                                             <div className="ml-4">
-                                                <div className="text-sm font-medium text-slate-900">{user.displayName}</div>
-                                                <div className="text-sm text-slate-500">{user.email}</div>
+                                                <div className="text-sm font-medium text-white">{user.displayName}</div>
+                                                <div className="text-sm text-slate-400">{user.email}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {user.isAdmin ? (
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                                                 Admin
                                             </span>
                                         ) : (
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-500/20 text-slate-300 border border-slate-500/30">
                                                 User
                                             </span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {user.isPremium ? (
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                                 Premium
                                             </span>
                                         ) : (
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-500/20 text-slate-300 border border-slate-500/30">
                                                 Free
                                             </span>
                                         )}
@@ -159,7 +159,7 @@ export default function AdminDashboardPage() {
                                         </button>
                                         <button
                                             onClick={() => setSelectedUser(user)}
-                                            className="text-xs text-indigo-600 hover:text-indigo-800 ml-2 font-medium"
+                                            className="text-xs text-purple-400 hover:text-purple-300 ml-2 font-medium"
                                         >
                                             Details
                                         </button>
@@ -219,13 +219,13 @@ function UserDetailModal({ user, onClose, onUpdate }: { user: UserProfile, onClo
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-start">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b border-white/10 flex justify-between items-start">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900">{user.displayName}</h2>
-                        <p className="text-slate-500 text-sm">{user.email}</p>
-                        <p className="text-xs text-slate-400 mt-1">UID: {user.uid}</p>
+                        <h2 className="text-xl font-bold text-white">{user.displayName}</h2>
+                        <p className="text-slate-400 text-sm">{user.email}</p>
+                        <p className="text-xs text-slate-500 mt-1">UID: {user.uid}</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
                         <span className="sr-only">Close</span>
