@@ -13,7 +13,6 @@ import {
 import { auth, googleProvider, /* appleProvider, */ db } from '../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { UserProfile } from '../types';
-import TermsModal from '../components/TermsModal';
 import CookieConsentModal from '../components/CookieConsentModal';
 
 interface AuthContextType {
@@ -114,7 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             tier: 'free',
                             credits: 3,
                             lastCreditReset: newlyCreatedTime, // Initialize reset time
-                            termsAccepted: false,
+                            termsAccepted: true,
+                            termsAcceptedAt: Date.now(),
                             cookiesAccepted: false
                         };
                         await setDoc(userDocRef, newProfile);
@@ -135,7 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         preferences: { theme: 'system' },
                         tier: 'free',
                         credits: 3,
-                        termsAccepted: false,
+                        termsAccepted: true,
+                        termsAcceptedAt: Date.now(),
                         cookiesAccepted: false
                     });
                 }
@@ -263,7 +264,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             preferences: { theme: 'system' },
                             tier: 'free',
                             credits: 3,
-                            termsAccepted: false,
+                            termsAccepted: true,
+                            termsAcceptedAt: Date.now(),
                             cookiesAccepted: false
                         };
             const userDocRef = doc(db, 'users', userCredential.user.uid);
@@ -395,8 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (
         <AuthContext.Provider value={value}>
             {!loading && children}
-            {!loading && userProfile && !userProfile?.termsAccepted && <TermsModal />}
-            {!loading && userProfile?.termsAccepted && !userProfile?.cookiesAccepted && !(userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro') && <CookieConsentModal />}
+            {!loading && !userProfile?.cookiesAccepted && !(userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro') && <CookieConsentModal />}
         </AuthContext.Provider>
     );
 }

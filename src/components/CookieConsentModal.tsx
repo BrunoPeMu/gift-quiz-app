@@ -11,9 +11,6 @@ export default function CookieConsentModal() {
     const hasActiveSubscription = userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro';
     
     if (hasAcceptedCookies || hasActiveSubscription) return null;
-    
-    // If terms not accepted yet, don't show this yet
-    if (!userProfile?.termsAccepted) return null;
 
     const handleAcceptCookies = async () => {
         await updateUserProfile({

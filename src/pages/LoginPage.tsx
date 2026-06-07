@@ -14,6 +14,7 @@ export default function LoginPage() {
     const [name, setName] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [termsChecked, setTermsChecked] = useState(false);
     const handleGoogleLogin = async () => {
         try {
             setLoading(true);
@@ -48,6 +49,7 @@ export default function LoginPage() {
         try {
             if (isRegistering) {
                 if (!name.trim()) throw new Error('Name is required');
+                if (!termsChecked) throw new Error(t('auth.termsRequired', { defaultValue: 'You must accept the terms and conditions' }));
                 await registerWithEmail(email, password, name);
             } else {
                 await loginWithEmail(email, password);
@@ -189,6 +191,23 @@ export default function LoginPage() {
                             />
                         </div>
                     </div>
+
+                    {isRegistering && (
+                        <label className="flex items-start gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={termsChecked}
+                                onChange={(e) => setTermsChecked(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm text-slate-600 dark:text-slate-300">
+                                {t('auth.acceptTerms', { defaultValue: 'He leído y acepto los ' })}
+                                <a href="/terms" target="_blank" className="text-indigo-600 hover:text-indigo-500 underline">
+                                    {t('auth.termsLink', { defaultValue: 'términos de uso' })}
+                                </a>
+                            </span>
+                        </label>
+                    )}
 
                     <button
                         type="submit"
