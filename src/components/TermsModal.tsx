@@ -23,7 +23,7 @@ export default function TermsModal() {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                <div className="shrink-0 p-6 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-3">
                         <Shield className="w-6 h-6 text-indigo-500" />
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Términos de Uso</h2>
@@ -34,7 +34,7 @@ export default function TermsModal() {
                 </div>
                 
                 <div 
-                    className="flex-1 overflow-y-auto p-6 text-sm text-slate-600 dark:text-slate-300 space-y-4"
+                    className="flex-1 min-h-0 overflow-y-auto p-6 text-sm text-slate-600 dark:text-slate-300 space-y-4"
                 >
                     <h3 className="font-bold text-slate-900 dark:text-white">1. Descripción del Servicio</h3>
                     <p>FlashTests es una aplicación web para crear, gestionar y practicar tests de estudio. Permite a los usuarios crear sus propias preguntas, organizarlas por temas y asignaturas, y generar tests personalizados para practicar.</p>
@@ -64,7 +64,7 @@ export default function TermsModal() {
                     <p>Para cualquier duda o problema, contacta a través de los canales de soporte de la app.</p>
                 </div>
 
-                <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700">
+                <div className="shrink-0 px-6 py-3 border-t border-slate-200 dark:border-slate-700">
                     <label className="flex items-start gap-3 cursor-pointer">
                         <input
                             type="checkbox"
@@ -78,7 +78,7 @@ export default function TermsModal() {
                     </label>
                 </div>
                 
-                <div className="px-6 pb-6 flex gap-3">
+                <div className="shrink-0 px-6 pb-6 flex gap-3">
                     <button
                         onClick={handleDecline}
                         className="flex-1 py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
