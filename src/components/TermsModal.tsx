@@ -4,7 +4,7 @@ import { Shield, Check } from 'lucide-react';
 
 export default function TermsModal() {
     const { userProfile, updateUserProfile } = useAuth();
-    const [scrolled, setScrolled] = useState(false);
+    const [accepted, setAccepted] = useState(false);
     
     if (userProfile?.termsAccepted) return null;
 
@@ -35,12 +35,6 @@ export default function TermsModal() {
                 
                 <div 
                     className="flex-1 overflow-y-auto p-6 text-sm text-slate-600 dark:text-slate-300 space-y-4"
-                    onScroll={(e) => {
-                        const target = e.target as HTMLDivElement;
-                        if (target.scrollHeight - target.scrollTop <= target.clientHeight + 50) {
-                            setScrolled(true);
-                        }
-                    }}
                 >
                     <h3 className="font-bold text-slate-900 dark:text-white">1. Descripción del Servicio</h3>
                     <p>FlashTests es una aplicación web para crear, gestionar y practicar tests de estudio. Permite a los usuarios crear sus propias preguntas, organizarlas por temas y asignaturas, y generar tests personalizados para practicar.</p>
@@ -69,8 +63,22 @@ export default function TermsModal() {
                     <h3 className="font-bold text-slate-900 dark:text-white mt-4">9. Contacto</h3>
                     <p>Para cualquier duda o problema, contacta a través de los canales de soporte de la app.</p>
                 </div>
+
+                <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={accepted}
+                            onChange={(e) => setAccepted(e.target.checked)}
+                            className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm text-slate-600 dark:text-slate-300">
+                            He leído y acepto los términos de uso de FlashTests
+                        </span>
+                    </label>
+                </div>
                 
-                <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex gap-3">
+                <div className="px-6 pb-6 flex gap-3">
                     <button
                         onClick={handleDecline}
                         className="flex-1 py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -79,11 +87,11 @@ export default function TermsModal() {
                     </button>
                     <button
                         onClick={handleAccept}
-                        disabled={!scrolled}
+                        disabled={!accepted}
                         className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         <Check className="w-4 h-4" />
-                        {scrolled ? 'Aceptar y continuar' : 'Desplázate para aceptar'}
+                        {accepted ? 'Aceptar y continuar' : 'Acepta los términos para continuar'}
                     </button>
                 </div>
             </div>
