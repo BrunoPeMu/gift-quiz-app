@@ -13,6 +13,8 @@ import {
 import { auth, googleProvider, /* appleProvider, */ db } from '../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { UserProfile } from '../types';
+import TermsModal from '../components/TermsModal';
+import CookieConsentModal from '../components/CookieConsentModal';
 
 interface AuthContextType {
     currentUser: User | null;
@@ -92,7 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             preferences: data.preferences || { theme: 'system' },
                             tier: data.tier || 'free',
                             credits: credits,
-                            lastCreditReset: lastCreditReset
+                            lastCreditReset: lastCreditReset,
+                            termsAccepted: data.termsAccepted || false,
+                            cookiesAccepted: data.cookiesAccepted || false
                         });
                     } else {
                         // Create new user profile if it doesn't exist
@@ -105,11 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             isPremium: false,
                             isAdmin: false,
                             role: 'user',
-                            createdAt: newlyCreatedTime,
+                            createdAt: Date.now(),
                             preferences: { theme: 'system' },
                             tier: 'free',
                             credits: 3,
-                            lastCreditReset: newlyCreatedTime // Initialize reset time
+                            lastCreditReset: newlyCreatedTime, // Initialize reset time
+                            termsAccepted: false,
+                            cookiesAccepted: false
                         };
                         await setDoc(userDocRef, newProfile);
                         setUserProfile(newProfile);
@@ -128,7 +134,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         createdAt: Date.now(),
                         preferences: { theme: 'system' },
                         tier: 'free',
-                        credits: 3
+                        credits: 3,
+                        termsAccepted: false,
+                        cookiesAccepted: false
                     });
                 }
             } else {
@@ -243,19 +251,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await updateAuthProfile(userCredential.user, { displayName: name });
 
             // Explicitly create user profile in Firestore to ensure it exists immediately
-            const newProfile: UserProfile = {
-                uid: userCredential.user.uid,
-                email: email,
-                displayName: name,
-                photoURL: undefined,
-                isPremium: false,
-                isAdmin: false,
-                role: 'user',
-                createdAt: Date.now(),
-                preferences: { theme: 'system' },
-                tier: 'free',
-                credits: 3
-            };
+                        const newProfile: UserProfile = {
+                            uid: userCredential.user.uid,
+                            email: email,
+                            displayName: name,
+                            photoURL: undefined,
+                            isPremium: false,
+                            isAdmin: false,
+                            role: 'user',
+                            createdAt: Date.now(),
+                            preferences: { theme: 'system' },
+                            tier: 'free',
+                            credits: 3,
+                            termsAccepted: false,
+                            cookiesAccepted: false
+                        };
             const userDocRef = doc(db, 'users', userCredential.user.uid);
             await setDoc(userDocRef, newProfile);
 
@@ -385,6 +395,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (
         <AuthContext.Provider value={value}>
             {!loading && children}
+            {!loading && userProfile && !userProfile?.termsAccepted && <TermsModal />}
+            {!loading && userProfile?.termsAccepted && !userProfile?.cookiesAccepted && !(userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro') && <CookieConsentModal />}
         </AuthContext.Provider>
     );
 }

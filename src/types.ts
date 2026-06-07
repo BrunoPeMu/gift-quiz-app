@@ -81,6 +81,12 @@ export interface UserProfile {
     tier?: 'guest' | 'free' | 'basic' | 'pro';
     credits?: number;
     lastCreditReset?: any;
+    
+    // Legal compliance
+    termsAccepted?: boolean;
+    termsAcceptedAt?: number;
+    cookiesAccepted?: boolean;
+    cookiesAcceptedAt?: number;
 }
 
 export interface Subject {
