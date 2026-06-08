@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateQuestions = void 0;
+exports.stripeWebhook = exports.createStripeCheckout = exports.generateQuestions = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const generative_ai_1 = require("@google/generative-ai");
+const Stripe = require("stripe");
 admin.initializeApp();
 const db = admin.firestore();
 // --- Configuration ---
@@ -200,4 +201,67 @@ exports.generateQuestions = functions.https.onCall(async (data, context) => {
 });
 // Optional: Scheduled function to reset credits globally (more robust than on-read)
 // export const resetDailyCredits = functions.pubsub.schedule('every 24 hours').onRun(async (context) => { ... });
+// --- Stripe Payments ---
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
+    apiVersion: '2026-05-27.dahlia',
+});
+exports.createStripeCheckout = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    }
+    const uid = context.auth.uid;
+    const { plan } = data;
+    const price = plan === 'yearly' ? 2999 : 499;
+    const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        client_reference_id: uid,
+        line_items: [
+            {
+                price_data: {
+                    currency: 'eur',
+                    product_data: {
+                        name: 'FlashTests PRO',
+                        description: `Suscripción ${plan === 'yearly' ? 'Anual' : 'Mensual'}`,
+                    },
+                    unit_amount: price,
+                    recurring: {
+                        interval: plan === 'yearly' ? 'year' : 'month',
+                    },
+                },
+                quantity: 1,
+            },
+        ],
+        // Use client origin if possible, otherwise default to production domain
+        success_url: `${process.env.CLIENT_URL || 'https://flashtests.app'}?checkout=success`,
+        cancel_url: `${process.env.CLIENT_URL || 'https://flashtests.app'}?checkout=cancel`,
+    });
+    return { url: session.url };
+});
+exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_placeholder';
+    let event;
+    try {
+        // req.rawBody is provided by Firebase functions
+        event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+    }
+    catch (err) {
+        functions.logger.error(`Webhook signature verification failed: ${err.message}`);
+        res.status(400).send(`Webhook Error: ${err.message}`);
+        return;
+    }
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const uid = session.client_reference_id;
+        if (uid) {
+            await db.collection('users').doc(uid).set({
+                isPremium: true,
+                tier: 'pro'
+            }, { merge: true });
+            functions.logger.info(`Upgraded user ${uid} to premium.`);
+        }
+    }
+    res.json({ received: true });
+});
 //# sourceMappingURL=index.js.map

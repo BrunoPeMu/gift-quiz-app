@@ -8,6 +8,8 @@ import { getTopicsData, getQuestions, addTopic, renameTopic as renameTopicServic
 import type { Question } from '../types';
 import { RewardedVideo } from '../components/RewardedVideo';
 import { addFreeCredits } from '../services/userService';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../services/firebase';
 
 export default function DashboardPage() {
     const { t } = useTranslation();
@@ -27,20 +29,21 @@ export default function DashboardPage() {
 
     const handleSubscribe = async () => {
         setCheckoutStep('processing');
-        setTimeout(async () => {
-            try {
-                await updateUserProfile({
-                    isPremium: true,
-                    tier: 'pro'
-                });
-                localStorage.setItem('isPremium', 'true');
-                setCheckoutStep('success');
-            } catch (err) {
-                console.error("Failed to purchase subscription", err);
-                setCheckoutStep('selection');
-                alert("Error al procesar la simulación de pago");
+        try {
+            const createCheckout = httpsCallable<{ plan: 'monthly' | 'yearly' }, { url: string }>(functions, 'createStripeCheckout');
+            const result = await createCheckout({ plan: billingCycle });
+            const checkoutUrl = result.data.url;
+            
+            if (checkoutUrl) {
+                window.location.assign(checkoutUrl);
+            } else {
+                throw new Error("No URL returned from server.");
             }
-        }, 2200);
+        } catch (err) {
+            console.error("Failed to connect to Stripe:", err);
+            setCheckoutStep('selection');
+            alert("Error al conectar con la pasarela de pago segura.");
+        }
     };
 
     const closePricingModal = () => {
@@ -87,6 +90,19 @@ export default function DashboardPage() {
     useEffect(() => {
         loadData();
     }, [currentUser]); // Reload data when user changes
+
+    useEffect(() => {
+        const query = new URLSearchParams(window.location.search);
+        if (query.get('checkout') === 'success') {
+            setIsPricingModalOpen(true);
+            setCheckoutStep('success');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (query.get('checkout') === 'cancel') {
+            setIsPricingModalOpen(true);
+            setCheckoutStep('selection');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
 
     async function loadData() {
         if (!currentUser || currentUser.uid === 'guest') return;
