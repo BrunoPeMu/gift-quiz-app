@@ -12,7 +12,7 @@ import { addFreeCredits } from '../services/userService';
 export default function DashboardPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { currentUser, updateUserProfile, userProfile, togglePremium, refreshProfile } = useAuth();
+    const { currentUser, updateUserProfile, userProfile, refreshProfile } = useAuth();
     const [stats, setStats] = useState({
         totalQuizzes: 0,
         averageScore: 0,
@@ -20,6 +20,35 @@ export default function DashboardPage() {
     });
     const [showRewardVideo, setShowRewardVideo] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+    const [checkoutStep, setCheckoutStep] = useState<'selection' | 'processing' | 'success'>('selection');
+
+    const handleSubscribe = async () => {
+        setCheckoutStep('processing');
+        setTimeout(async () => {
+            try {
+                await updateUserProfile({
+                    isPremium: true,
+                    tier: 'pro'
+                });
+                localStorage.setItem('isPremium', 'true');
+                setCheckoutStep('success');
+            } catch (err) {
+                console.error("Failed to purchase subscription", err);
+                setCheckoutStep('selection');
+                alert("Error al procesar la simulación de pago");
+            }
+        }, 2200);
+    };
+
+    const closePricingModal = () => {
+        setIsPricingModalOpen(false);
+        if (checkoutStep === 'success') {
+            setCheckoutStep('selection');
+        }
+    };
 
     const handleAdReward = async () => {
         if (!currentUser) return;
@@ -46,6 +75,7 @@ export default function DashboardPage() {
     const [newUsername, setNewUsername] = useState('');
     const [newPhotoURL, setNewPhotoURL] = useState('');
     const [newTheme, setNewTheme] = useState<'light' | 'dark' | 'system'>('system');
+    const [newBio, setNewBio] = useState('');
 
     // Dashboard specific state
     const [topicStats, setTopicStats] = useState<TopicStats[]>([]);
@@ -228,17 +258,12 @@ export default function DashboardPage() {
         loadData();
     };
 
-    // startEditingTopic removed
-
-
-
-
-
     const handleEditProfile = () => {
         setNewName(currentUser?.displayName || '');
         setNewUsername(userProfile?.username || '');
         setNewPhotoURL(currentUser?.photoURL || '');
         setNewTheme(userProfile?.preferences?.theme || 'system');
+        setNewBio(userProfile?.bio || '');
         setIsEditingProfile(true);
     };
 
@@ -252,6 +277,7 @@ export default function DashboardPage() {
                 displayName: newName.trim(),
                 username: newUsername.trim() || undefined,
                 photoURL: newPhotoURL.trim() || undefined,
+                bio: newBio.trim(),
                 preferences: {
                     ...userProfile?.preferences,
                     theme: newTheme
@@ -332,6 +358,12 @@ export default function DashboardPage() {
                             <h2 className="text-xl sm:text-2xl font-normal text-slate-900 dark:text-white">
                                 {userProfile?.username || (currentUser ? 'username' : 'guest')}
                             </h2>
+                            {userProfile?.isPremium && (
+                                <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-md ring-2 ring-yellow-400/20">
+                                    <Crown className="w-3 h-3 fill-current text-slate-950" />
+                                    <span>PRO</span>
+                                </span>
+                            )}
                             {/* Settings icon could go here */}
                             <button className="sm:hidden text-slate-900 dark:text-white">
                                 <span className="sr-only">Settings</span>
@@ -412,39 +444,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Highlights / Stories Bar */}
-                <div className="flex space-x-6 overflow-x-auto pb-4 hide-scrollbar px-4 sm:px-0 mb-6">
-                    {/* Add Topic Bubble */}
-                    <div className="flex flex-col items-center flex-shrink-0 cursor-pointer" onClick={() => setIsAddingTopic(true)}>
-                        <div className="w-16 h-16 rounded-full border border-slate-200 dark:border-slate-800 p-1 mb-1 flex items-center justify-center">
-                            <div className="w-full h-full bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center">
-                                <Plus className="w-6 h-6 text-slate-900 dark:text-white" />
-                            </div>
-                        </div>
-                        <span className="text-xs truncate max-w-[64px] text-center font-medium">Nuevo</span>
-                    </div>
 
-                    {/* Recover Data Bubble */}
-                    <div className="flex flex-col items-center flex-shrink-0 cursor-pointer" onClick={handleMigrateData}>
-                        <div className="w-16 h-16 rounded-full border border-slate-200 dark:border-slate-800 p-1 mb-1 flex items-center justify-center">
-                            <div className="w-full h-full bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center">
-                                <Check className="w-6 h-6 text-green-600 dark:text-green-400" />
-                            </div>
-                        </div>
-                        <span className="text-xs truncate max-w-[64px] text-center font-medium">Recuperar</span>
-                    </div>
-
-                    {!userProfile?.isPremium && (
-                        <div className="flex flex-col items-center flex-shrink-0 cursor-pointer" onClick={togglePremium}>
-                            <div className="w-16 h-16 rounded-full border-2 border-yellow-400 p-1 mb-1 flex items-center justify-center">
-                                <div className="w-full h-full bg-yellow-50 dark:bg-yellow-900/20 rounded-full flex items-center justify-center">
-                                    <Crown className="w-6 h-6 text-yellow-500" />
-                                </div>
-                            </div>
-                            <span className="text-xs truncate max-w-[64px] text-center font-medium">Premium</span>
-                        </div>
-                    )}
-                </div>
 
                 {/* Tab Icons (Grid vs List/Stats) */}
                 {/* Removed Tab Icons as Stats tab is not needed */}
@@ -455,13 +455,13 @@ export default function DashboardPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Edit Profile</h2>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Editar perfil</h2>
                             <button onClick={() => setIsEditingProfile(false)}><X className="w-6 h-6 text-slate-500" /></button>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-900 dark:text-white mb-1">Name</label>
+                                <label className="block text-sm font-medium text-slate-900 dark:text-white mb-1">Nombre</label>
                                 <input
                                     type="text"
                                     value={newName}
@@ -470,29 +470,33 @@ export default function DashboardPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-900 dark:text-white mb-1">Bio</label>
+                                <label className="block text-sm font-medium text-slate-900 dark:text-white mb-1">Biografía</label>
                                 <textarea
-                                    value={userProfile?.bio || ''} // We need to add state for this: newBio
-                                    onChange={(e) => {
-                                        // Quick hack: update directly or add state. Ideally add 'newBio' state.
-                                        // For now let's assume updateProfile handles it if we add it to saving logic.
-                                        // I'll add newBio state in the replacement.
-                                        updateUserProfile({ bio: e.target.value }); // This updates context directly which might reflect immediately in UI? No, needs save.
-                                        // Actually let's assume I added newBio state above (I haven't yet).
-                                        // I'll stick to a placeholder or add the state.
-                                    }}
-                                    placeholder="Write a short bio..."
+                                    value={newBio}
+                                    onChange={(e) => setNewBio(e.target.value)}
+                                    placeholder="Escribe algo sobre ti..."
                                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 text-slate-900 dark:text-white focus:ring-1 focus:ring-slate-900 dark:focus:ring-white h-24 resize-none"
                                 />
-                                <p className="text-xs text-slate-500 mt-1">This will appear on your profile.</p>
+                                <p className="text-xs text-slate-500 mt-1">Esto se mostrará en tu perfil público.</p>
                             </div>
-                            {/* ... (Theme, Avatar URL similar to above) ... */}
-                            <div className="pt-4 flex justify-end">
+                            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                                {currentUser && currentUser.uid !== 'guest' ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsEditingProfile(false);
+                                            handleMigrateData();
+                                        }}
+                                        className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                                    >
+                                        Recuperar datos locales
+                                    </button>
+                                ) : <div />}
                                 <button
                                     onClick={saveProfile}
-                                    className="bg-slate-900 dark:bg-white text-white dark:text-black font-semibold px-6 py-2 rounded-xl"
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2 rounded-xl text-sm transition-colors"
                                 >
-                                    Done
+                                    Guardar
                                 </button>
                             </div>
                         </div>
@@ -552,6 +556,32 @@ export default function DashboardPage() {
 
             {/* Tab Content */}
             <div className="min-h-[200px]">
+                {/* Promo Premium Banner */}
+                {!userProfile?.isPremium && currentUser && currentUser.uid !== 'guest' && (
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 p-6 sm:p-8 shadow-xl mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        {/* Glow effect */}
+                        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                        
+                        <div className="relative z-10 space-y-2">
+                            <div className="inline-flex items-center space-x-2 bg-yellow-500/15 border border-yellow-500/30 rounded-full px-3 py-1 text-xs font-bold text-yellow-400">
+                                <Crown className="w-3.5 h-3.5 fill-current text-yellow-400" />
+                                <span>ACCESO ILIMITADO</span>
+                            </div>
+                            <h3 className="text-xl sm:text-2xl font-bold text-white">Consigue FlashTests PRO</h3>
+                            <p className="text-slate-300 text-sm max-w-xl">
+                                Desbloquea generación ilimitada de tests por inteligencia artificial, explicaciones paso a paso de las respuestas correctas y despídete de la publicidad.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsPricingModalOpen(true)}
+                            className="relative z-10 flex-shrink-0 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-bold px-6 py-3 rounded-2xl shadow-lg hover:shadow-yellow-500/20 active:scale-95 transition-all text-sm flex items-center space-x-2"
+                        >
+                            <span>Ver Ventajas</span>
+                        </button>
+                    </div>
+                )}
+
                 {/* Main Content Area */}
                 <div className="mt-2">
                     {/* Guest View: Call to Action & Tips */}
@@ -585,7 +615,22 @@ export default function DashboardPage() {
                         </div>
                     ) : (
                         /* Logged In User View: Topics Grid */
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                        <div className="space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Mis Asignaturas y Temas</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">Selecciona un tema para configurar y comenzar tu test.</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsAddingTopic(true)}
+                                    className="hidden sm:flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors shadow-sm active:scale-95"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Crear tema</span>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
                             {[0, 1, 2, 3].map((colIndex) => (
                                 <div key={colIndex} className="flex flex-col gap-4">
                                     {Object.entries(topicsBySubject)
@@ -725,6 +770,7 @@ export default function DashboardPage() {
                                     }
                                 </div>
                             ))}
+                            </div>
                         </div>
                     )}
 
@@ -819,6 +865,160 @@ export default function DashboardPage() {
                     <Plus className="w-6 h-6" />
                 </button>
             </div>
+
+            {/* Pricing / Premium Subscription Modal */}
+            {isPricingModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative">
+                        {/* Glow spots */}
+                        <div className="absolute top-0 right-0 -mt-20 -mr-20 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                        {/* Close button */}
+                        {checkoutStep !== 'processing' && (
+                            <button 
+                                onClick={closePricingModal}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 p-1.5 rounded-full transition-colors z-10"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        )}
+
+                        {checkoutStep === 'selection' && (
+                            <div className="p-6 sm:p-8 space-y-6">
+                                <div className="text-center space-y-2">
+                                    <div className="inline-flex p-3 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 text-yellow-500 rounded-2xl mb-2 border border-yellow-500/30">
+                                        <Crown className="w-8 h-8 text-yellow-500 animate-pulse" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-white">Hazte FlashTests PRO</h2>
+                                    <p className="text-slate-400 text-sm">
+                                        Prepara tus exámenes u oposiciones sin límites de preguntas, sin publicidad y con ayuda de Inteligencia Artificial.
+                                    </p>
+                                </div>
+
+                                {/* Features List */}
+                                <div className="space-y-3 bg-slate-950/40 border border-white/5 rounded-2xl p-4 sm:p-5">
+                                    <div className="flex items-start space-x-3 text-sm">
+                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
+                                            <Check className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-slate-200">
+                                            <strong className="text-white font-semibold">Generación Ilimitada:</strong> Crea tantos temas y tests como necesites sin restricción de créditos.
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start space-x-3 text-sm">
+                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
+                                            <Check className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-slate-200">
+                                            <strong className="text-white font-semibold">Explicaciones con IA:</strong> Entiende por qué fallas con análisis paso a paso en cada pregunta.
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start space-x-3 text-sm">
+                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
+                                            <Check className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-slate-200">
+                                            <strong className="text-white font-semibold">Sin Anuncios:</strong> Estudia concentrado con una interfaz limpia y libre de banners.
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start space-x-3 text-sm">
+                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
+                                            <Check className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-slate-200">
+                                            <strong className="text-white font-semibold">Estadísticas completas:</strong> Historial completo de notas y dominio de asignaturas.
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Billing Selector */}
+                                <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
+                                    <button
+                                        onClick={() => setBillingCycle('monthly')}
+                                        className={`py-2 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'monthly' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        Mensual
+                                    </button>
+                                    <button
+                                        onClick={() => setBillingCycle('yearly')}
+                                        className={`py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center space-x-2 ${billingCycle === 'yearly' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        <span>Anual</span>
+                                        <span className="bg-yellow-400/20 text-yellow-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                            -50%
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {/* Plan pricing details */}
+                                <div className="text-center p-2">
+                                    {billingCycle === 'monthly' ? (
+                                        <div>
+                                            <span className="text-3xl font-bold text-white">4,99 €</span>
+                                            <span className="text-slate-400 text-sm"> / mes</span>
+                                            <p className="text-xs text-slate-500 mt-1">Cancela cuando quieras. Sin permanencia.</p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <span className="text-3xl font-bold text-white">29,99 €</span>
+                                            <span className="text-slate-400 text-sm"> / año</span>
+                                            <p className="text-xs text-slate-500 mt-1">Equivalente a 2,49 € al mes. Facturado anualmente.</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* CTA Button */}
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={handleSubscribe}
+                                        className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-bold rounded-2xl shadow-lg hover:shadow-yellow-500/10 active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                                    >
+                                        <span>Comenzar Suscripción</span>
+                                    </button>
+                                    <div className="flex items-center justify-center space-x-1 text-slate-500 text-xs">
+                                        <span>🔒 Pago seguro SSL por Stripe</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {checkoutStep === 'processing' && (
+                            <div className="p-8 text-center space-y-6 py-16 flex flex-col items-center">
+                                <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                                <div className="space-y-2">
+                                    <h3 className="text-lg font-bold text-white">Conectando con Stripe...</h3>
+                                    <p className="text-slate-400 text-sm max-w-xs mx-auto">
+                                        Estamos procesando tu suscripción de pruebas de forma segura. No cierres esta ventana.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {checkoutStep === 'success' && (
+                            <div className="p-8 text-center space-y-6 py-12 flex flex-col items-center">
+                                <div className="inline-flex p-4 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30 mb-2 relative">
+                                    <span className="absolute top-0 left-0 w-2 h-2 bg-yellow-400 rounded-full animate-ping"></span>
+                                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-pink-500 rounded-full animate-ping"></span>
+                                    <Check className="w-10 h-10 text-emerald-400" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h2 className="text-2xl font-bold text-white">¡Ya eres miembro PRO! 🎉</h2>
+                                    <p className="text-slate-300 text-sm max-w-sm mx-auto leading-relaxed">
+                                        ¡Tu pago de pruebas ha sido exitoso! Tu cuenta ha sido elevada a PRO. Disfruta de generación ilimitada y cero anuncios.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={closePricingModal}
+                                    className="w-full sm:w-auto px-8 py-3 bg-white hover:bg-slate-100 text-slate-900 font-bold rounded-xl transition-all shadow-md active:scale-95 text-sm"
+                                >
+                                    ¡Comenzar a estudiar!
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
