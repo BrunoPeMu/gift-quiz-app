@@ -135,7 +135,12 @@ const checkAndDeductCredits = async (uid: string, tier: string): Promise<boolean
 
 // --- Cloud Function ---
 
-export const generateQuestions = functions.https.onCall(async (data: GenerateQuestionsData, context: functions.https.CallableContext) => {
+export const generateQuestions = functions
+    .runWith({
+        timeoutSeconds: 120,
+        memory: "1GB"
+    })
+    .https.onCall(async (data: GenerateQuestionsData, context: functions.https.CallableContext) => {
     // 0. Setup
     const apiKey = getApiKey();
     if (!apiKey) throw new functions.https.HttpsError("internal", "Server configuration error (API Key)");

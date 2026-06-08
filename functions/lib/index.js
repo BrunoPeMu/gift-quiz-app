@@ -102,7 +102,12 @@ const checkAndDeductCredits = async (uid, tier) => {
     });
 };
 // --- Cloud Function ---
-exports.generateQuestions = functions.https.onCall(async (data, context) => {
+exports.generateQuestions = functions
+    .runWith({
+    timeoutSeconds: 120,
+    memory: "1GB"
+})
+    .https.onCall(async (data, context) => {
     // 0. Setup
     const apiKey = getApiKey();
     if (!apiKey)
