@@ -631,145 +631,138 @@ export default function DashboardPage() {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-                            {[0, 1, 2, 3].map((colIndex) => (
-                                <div key={colIndex} className="flex flex-col gap-4">
-                                    {Object.entries(topicsBySubject)
-                                        .filter((_, idx) => idx % 4 === colIndex)
-                                        .map(([subject, topics]) => {
-                                            const isSubjectCollapsed = collapsedSubjects.has(subject);
-                                            return (
-                                            <div key={subject} className="card overflow-hidden w-full">
-                                                <div 
-                                                    className="p-4 border-b border-white/5 flex justify-between items-center bg-slate-900/40 cursor-pointer hover:bg-slate-800/60 transition-colors"
-                                                    onClick={() => toggleSubject(subject)}
-                                                >
-                                                    <div className="flex items-center space-x-2 overflow-hidden pr-2">
-                                                        {isSubjectCollapsed ? (
-                                                            <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                                        ) : (
-                                                            <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                                        )}
-                                                        <h3 className="font-bold text-white truncate" title={subject}>
-                                                            {subject}
-                                                        </h3>
-                                                    </div>
-                                                    <span className="text-xs font-semibold px-2 py-1 bg-slate-700 rounded-full text-slate-300 flex-shrink-0">
-                                                        {topics.length}
-                                                    </span>
+                                {Object.entries(topicsBySubject).map(([subject, topics]) => {
+                                    const isSubjectCollapsed = collapsedSubjects.has(subject);
+                                    return (
+                                        <div key={subject} className="card overflow-hidden w-full">
+                                            <div 
+                                                className="p-4 border-b border-white/5 flex justify-between items-center bg-slate-900/40 cursor-pointer hover:bg-slate-800/60 transition-colors"
+                                                onClick={() => toggleSubject(subject)}
+                                            >
+                                                <div className="flex items-center space-x-2 overflow-hidden pr-2">
+                                                    {isSubjectCollapsed ? (
+                                                        <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                                    ) : (
+                                                        <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                                    )}
+                                                    <h3 className="font-bold text-white truncate" title={subject}>
+                                                        {subject}
+                                                    </h3>
                                                 </div>
-                                                
-                                                {!isSubjectCollapsed && (
-                                                <div className="divide-y divide-white/5">
-                                                    {topics.map(topic => {
-                                                        const isExpanded = expandedTopics.has(topic.topic);
-                                                        const generalPercentage = topic.totalAttempts > 0 ? (topic.correctAttempts / topic.totalAttempts) : 0;
+                                                <span className="text-xs font-semibold px-2 py-1 bg-slate-700 rounded-full text-slate-300 flex-shrink-0">
+                                                    {topics.length}
+                                                </span>
+                                            </div>
+                                            
+                                            {!isSubjectCollapsed && (
+                                            <div className="divide-y divide-white/5">
+                                                {topics.map(topic => {
+                                                    const isExpanded = expandedTopics.has(topic.topic);
+                                                    const generalPercentage = topic.totalAttempts > 0 ? (topic.correctAttempts / topic.totalAttempts) : 0;
 
-                                                        const handleSaveRename = async () => {
-                                                            if (!currentUser || currentUser.uid === 'guest') return;
-                                                            if (tempTopicName.trim() && tempTopicName !== topic.topic) {
-                                                                await renameTopicService(topic.topic, topic.subject || '', tempTopicName.trim(), currentUser.uid);
-                                                            }
-                                                            setEditingTopicId(null);
-                                                            loadData();
-                                                        };
+                                                    const handleSaveRename = async () => {
+                                                        if (!currentUser || currentUser.uid === 'guest') return;
+                                                        if (tempTopicName.trim() && tempTopicName !== topic.topic) {
+                                                            await renameTopicService(topic.topic, topic.subject || '', tempTopicName.trim(), currentUser.uid);
+                                                        }
+                                                        setEditingTopicId(null);
+                                                        loadData();
+                                                    };
 
-                                                        const cancelRename = () => {
-                                                            setEditingTopicId(null);
-                                                            setTempTopicName('');
-                                                        };
+                                                    const cancelRename = () => {
+                                                        setEditingTopicId(null);
+                                                        setTempTopicName('');
+                                                    };
 
-                                                        return (
-                                                            <div key={topic.topic} className="group p-3 hover:bg-white/5 transition-colors">
-                                                                <div
-                                                                    className="flex items-center justify-between cursor-pointer"
-                                                                    onClick={() => toggleTopic(topic.topic)}
-                                                                >
-                                                                    <div className="flex-1 min-w-0 pr-2">
-                                                                        {editingTopicId === topic.topic ? (
-                                                                            <div className="flex items-center space-x-2">
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={tempTopicName}
-                                                                                    onChange={(e) => setTempTopicName(e.target.value)}
-                                                                                    className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-white focus:ring-2 focus:ring-purple-500"
-                                                                                    autoFocus
-                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                    onKeyDown={(e) => {
-                                                                                        if (e.key === 'Enter') handleSaveRename();
-                                                                                        if (e.key === 'Escape') cancelRename();
-                                                                                    }}
-                                                                                />
-                                                                                <button onClick={(e) => { e.stopPropagation(); handleSaveRename(); }} className="p-1 text-green-400 hover:bg-green-400/10 rounded">
-                                                                                    <Check className="w-4 h-4" />
-                                                                                </button>
-                                                                                <button onClick={(e) => { e.stopPropagation(); cancelRename(); }} className="p-1 text-red-400 hover:bg-red-400/10 rounded">
-                                                                                    <X className="w-4 h-4" />
-                                                                                </button>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="font-medium text-sm text-slate-200 truncate">{topic.topic}</div>
-                                                                        )}
-                                                                        <span className="text-xs text-slate-400">{topic.questionCount || 0} q</span>
-                                                                    </div>
-
-                                                                    <div className="flex items-center space-x-2">
-                                                                        <div
-                                                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${generalPercentage > 0.8 ? 'border-green-500 text-green-500' :
-                                                                                generalPercentage > 0.5 ? 'border-yellow-500 text-yellow-500' :
-                                                                                    'border-slate-600 text-slate-400'
-                                                                                }`}
-                                                                        >
-                                                                            {Math.round(generalPercentage * 100)}
+                                                    return (
+                                                        <div key={topic.topic} className="group p-3 hover:bg-white/5 transition-colors">
+                                                            <div
+                                                                className="flex items-center justify-between cursor-pointer"
+                                                                onClick={() => toggleTopic(topic.topic)}
+                                                            >
+                                                                <div className="flex-1 min-w-0 pr-2">
+                                                                    {editingTopicId === topic.topic ? (
+                                                                        <div className="flex items-center space-x-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                value={tempTopicName}
+                                                                                onChange={(e) => setTempTopicName(e.target.value)}
+                                                                                className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-white focus:ring-2 focus:ring-purple-500"
+                                                                                autoFocus
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') handleSaveRename();
+                                                                                    if (e.key === 'Escape') cancelRename();
+                                                                                }}
+                                                                            />
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleSaveRename(); }} className="p-1 text-green-400 hover:bg-green-400/10 rounded">
+                                                                                <Check className="w-4 h-4" />
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); cancelRename(); }} className="p-1 text-red-400 hover:bg-red-400/10 rounded">
+                                                                                <X className="w-4 h-4" />
+                                                                            </button>
                                                                         </div>
-                                                                        <Play
-                                                                            onClick={(e) => { e.stopPropagation(); handleQuickStart(topic.topic); }}
-                                                                            className="w-4 h-4 text-slate-400 hover:text-purple-400"
-                                                                        />
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                setEditingTopicId(topic.topic);
-                                                                                setTempTopicName(topic.topic);
-                                                                            }}
-                                                                            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded-full transition-all"
-                                                                            title={t('common.edit')}
-                                                                        >
-                                                                            <Edit2 className="w-3.5 h-3.5" />
-                                                                        </button>
-                                                                    </div>
+                                                                    ) : (
+                                                                        <div className="font-medium text-sm text-slate-200 truncate">{topic.topic}</div>
+                                                                    )}
+                                                                    <span className="text-xs text-slate-400">{topic.questionCount || 0} q</span>
                                                                 </div>
 
-                                                                {/* Expanded Details */}
-                                                                {isExpanded && (
-                                                                    <div className="mt-2 px-3 py-2 bg-slate-900/50 rounded-lg border border-white/5">
-                                                                        <div className="flex justify-between items-center mb-2">
-                                                                            <span className="text-[10px] uppercase text-slate-400 font-bold">Details</span>
-                                                                            <div className="flex space-x-3">
-                                                                                <Edit2 onClick={() => { setEditingTopicId(topic.topic); setTempTopicName(topic.topic); }} className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
-                                                                                <Share className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="grid grid-cols-3 gap-1">
-                                                                            {Object.entries(topic.byDifficulty).map(([diff, d]: [string, any]) => (
-                                                                                <div key={diff} className="text-center bg-slate-800/50 rounded p-1">
-                                                                                    <div className="text-[10px] text-slate-400">{diff[0].toUpperCase()}</div>
-                                                                                    <div className="text-xs font-mono text-slate-300">{d.correct}/{d.total}</div>
-                                                                                </div>
-                                                                            ))}
+                                                                <div className="flex items-center space-x-2">
+                                                                    <div
+                                                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${generalPercentage > 0.8 ? 'border-green-500 text-green-500' :
+                                                                            generalPercentage > 0.5 ? 'border-yellow-500 text-yellow-500' :
+                                                                                'border-slate-600 text-slate-400'
+                                                                            }`}
+                                                                    >
+                                                                        {Math.round(generalPercentage * 100)}
+                                                                    </div>
+                                                                    <Play
+                                                                        onClick={(e) => { e.stopPropagation(); handleQuickStart(topic.topic); }}
+                                                                        className="w-4 h-4 text-slate-400 hover:text-purple-400"
+                                                                    />
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setEditingTopicId(topic.topic);
+                                                                            setTempTopicName(topic.topic);
+                                                                        }}
+                                                                        className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded-full transition-all"
+                                                                        title={t('common.edit')}
+                                                                    >
+                                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Expanded Details */}
+                                                            {isExpanded && (
+                                                                <div className="mt-2 px-3 py-2 bg-slate-900/50 rounded-lg border border-white/5">
+                                                                    <div className="flex justify-between items-center mb-2">
+                                                                        <span className="text-[10px] uppercase text-slate-400 font-bold">Details</span>
+                                                                        <div className="flex space-x-3">
+                                                                            <Edit2 onClick={() => { setEditingTopicId(topic.topic); setTempTopicName(topic.topic); }} className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
+                                                                            <Share className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
                                                                         </div>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                                )}
+                                                                    <div className="grid grid-cols-3 gap-1">
+                                                                        {Object.entries(topic.byDifficulty).map(([diff, d]: [string, any]) => (
+                                                                            <div key={diff} className="text-center bg-slate-800/50 rounded p-1">
+                                                                                <div className="text-[10px] text-slate-400">{diff[0].toUpperCase()}</div>
+                                                                                <div className="text-xs font-mono text-slate-300">{d.correct}/{d.total}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                        })
-                                    }
-                                </div>
-                            ))}
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
