@@ -20,11 +20,13 @@ export interface GeneratedQuestion {
  * @param types - Array of types e.g. ['MCQ', 'TF'].
  */
 export async function generateQuestions(
-    _apiKey: string, // Kept for now to avoid breaking UploadPage immediately, but we will ignore it.
+    _apiKey: string, // Kept for now to avoid breaking UploadPage immediately
     text: string,
     difficulty: 'easy' | 'medium' | 'hard',
     count: number,
-    types: string[] = ['MCQ', 'TF', 'SHORT']
+    types: string[] = ['MCQ', 'TF', 'SHORT'],
+    mode: 'generate' | 'parse' = 'generate',
+    pdf?: string
 ): Promise<GeneratedQuestion[]> {
 
     // Logic moved to backend.
@@ -32,7 +34,9 @@ export async function generateQuestions(
 
     try {
         const result = await generate({
-            text,
+            text: text || undefined,
+            pdf,
+            mode,
             difficulty,
             count,
             types

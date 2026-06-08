@@ -62,7 +62,9 @@ const TIERS: Record<string, TierConfig> = {
 // --- Interfaces ---
 
 interface GenerateQuestionsData {
-    text: string;
+    text?: string;
+    pdf?: string;
+    mode?: 'generate' | 'parse';
     difficulty?: 'easy' | 'medium' | 'hard';
     count?: number;
     types?: string[];
@@ -138,8 +140,10 @@ export const generateQuestions = functions.https.onCall(async (data: GenerateQue
     const apiKey = getApiKey();
     if (!apiKey) throw new functions.https.HttpsError("internal", "Server configuration error (API Key)");
 
-    const { text, difficulty, count, types } = data;
-    if (!text) throw new functions.https.HttpsError("invalid-argument", "Source text is required");
+    const { text, pdf, mode = 'generate', difficulty, count, types } = data;
+    if (!text && !pdf) {
+        throw new functions.https.HttpsError("invalid-argument", "Either source text or PDF is required");
+    }
 
     // 1. Auth & Tier Resolution
     let tier = 'guest';
@@ -149,20 +153,22 @@ export const generateQuestions = functions.https.onCall(async (data: GenerateQue
         uid = context.auth.uid;
         tier = await getUserTier(uid);
     } else {
-        // Guest Logic: In a real app, track IP or device ID limits. 
-        // For this implementation, we simply allow it but enforcement is weak (honor system/client driven for now)
-        // or we could throw unauthenticated if we want to force login.
-        // The prompt says "Guest" exists.
         tier = 'guest';
     }
 
     const config = TIERS[tier];
 
-    // 2. Validate Context Size
-    if (text.length > config.maxContextChars) {
+    // 2. Validate Size Limits
+    if (text && text.length > config.maxContextChars) {
         throw new functions.https.HttpsError(
             "resource-exhausted",
             `Text too long for ${tier.toUpperCase()} tier. Limit is ${config.maxContextChars} characters.`
+        );
+    }
+    if (pdf && pdf.length > 7 * 1024 * 1024) { // ~5MB file limit (base64 is ~1.37 times larger)
+        throw new functions.https.HttpsError(
+            "resource-exhausted",
+            "PDF file too large. Limit is 5MB."
         );
     }
 
@@ -183,55 +189,98 @@ export const generateQuestions = functions.https.onCall(async (data: GenerateQue
         }
     });
 
-    const difficultyPrompts = {
-        easy: "Create simple, direct recall questions. The answers should be explicitly stated in the text. Distractors should be obviously incorrect.",
-        medium: "Create questions that require understanding concepts. Distractors should be plausible but incorrect.",
-        hard: "Create challenging questions that test nuance, exceptions, or deep understanding. Distractors should be very similar to the correct answer."
-    };
+    const parts: any[] = [];
 
-    const typeDescriptions = {
-        'MCQ': 'MC (Multiple Choice, 4 options)',
-        'TF': 'TF (True/False)',
-        'SHORT': 'SHORT (Short Answer / Fill in the blank)'
-    };
+    if (mode === 'parse') {
+        const parsePrompt = `
+        You are an expert assistant specialized in parsing existing test questionnaires.
+        Analyze the provided document (which could be a copy-pasted layout, standard text, or a PDF file).
+        
+        Your objective is to extract all the questions, their multiple-choice options (if any), and determine the correct answer.
+        
+        CRITICAL RULES:
+        1. Do NOT invent new questions. ONLY extract the questions that are explicitly present in the provided source.
+        2. Identify the correct answer for each question. The correct answer may be marked directly next to the question (e.g. bolded, with an asterisk *, or a checkmark), OR it may be listed at the end of the document in a "key/solutions" section (e.g., "1-A, 2-B, 3-C..." or "Soluciones: 1.a, 2.b..."). Match these answer keys to the extracted questions.
+        3. For Multiple Choice (MC), provide strictly 4 options. If the original question has fewer than 4 options (e.g. 3 options), generate plausible distractors to complete exactly 4 options. Make sure the correct answer matches one of the options.
+        4. For True/False (TF) questions, 'options' must be null. The 'answer' must be "True" or "False".
+        5. For Short Answer (SHORT) questions, 'options' must be null. The 'answer' is the correct term/phrase.
+        6. Evaluate the difficulty of each question based on its cognitive complexity (e.g., simple factual recall is "easy", conceptual application is "medium", deep analysis/nuance/complex problem solving is "hard"). Tag each question's difficulty individually as "easy", "medium", or "hard".
+        
+        Output JSON Schema:
+        [
+          {
+            "text": "Question stem here",
+            "type": "MC" | "TF" | "SHORT",
+            "options": ["Option A", "Option B", "Option C", "Option D"], // Only for MC (4 options). For TF/SHORT, omit or null.
+            "answer": "Correct Answer String",
+            "difficulty": "easy" | "medium" | "hard"
+          }
+        ]
+        
+        Return ONLY the raw JSON array.
+        `;
+        parts.push(parsePrompt);
+    } else {
+        // Mode 'generate' (standard syllabus-based generation)
+        const difficultyPrompts = {
+            easy: "Create simple, direct recall questions. The answers should be explicitly stated in the text. Distractors should be obviously incorrect.",
+            medium: "Create questions that require understanding concepts. Distractors should be plausible but incorrect.",
+            hard: "Create challenging questions that test nuance, exceptions, or deep understanding. Distractors should be very similar to the correct answer."
+        };
 
-    const selectedTypes = (types || ['MCQ', 'TF', 'SHORT'])
-        .map((t: string) => typeDescriptions[t as keyof typeof typeDescriptions] || t)
-        .join(', ');
+        const typeDescriptions = {
+            'MCQ': 'MC (Multiple Choice, 4 options)',
+            'TF': 'TF (True/False)',
+            'SHORT': 'SHORT (Short Answer / Fill in the blank)'
+        };
 
-    const prompt = `
-    You are an expert teacher creating a quiz.
-    Based strictly on the following text, generate ${count || 5} questions in a valid JSON array format.
-    
-    Difficulty Level: ${(difficulty || 'medium').toUpperCase()}
-    ${difficultyPrompts[(difficulty || 'medium') as keyof typeof difficultyPrompts] || difficultyPrompts['medium']}
-    
-    Question Types to Include: ${selectedTypes}
-    
-    Output JSON Schema:
-    [
-      {
-        "text": "Question stem here",
-        "type": "MC" | "TF" | "SHORT",
-        "options": ["Option A", "Option B", "Option C", "Option D"], // Only for MC (4 options). For TF/SHORT, omit or null.
-        "answer": "Correct Answer String",
-        "difficulty": "${difficulty || 'medium'}"
-      }
-    ]
-    
-    Rules:
-    1. STRICTLY adhere to the provided text.
-    2. For Multiple Choice (MC), provide strictly 4 options. The correct answer MUST be one of them.
-    3. For True/False (TF), 'options' should be null. 'answer' must be "True" or "False".
-    4. For Short Answer (SHORT), 'options' should be null. 'answer' is the correct term.
-    5. Return ONLY the JSON array.
-    
-    Text:
-    ${text}
-    `;
+        const selectedTypes = (types || ['MCQ', 'TF', 'SHORT'])
+            .map((t: string) => typeDescriptions[t as keyof typeof typeDescriptions] || t)
+            .join(', ');
+
+        const generatePrompt = `
+        You are an expert teacher creating a quiz.
+        Based strictly on the following text, generate ${count || 5} questions in a valid JSON array format.
+        
+        Difficulty Level: ${(difficulty || 'medium').toUpperCase()}
+        ${difficultyPrompts[(difficulty || 'medium') as keyof typeof difficultyPrompts] || difficultyPrompts['medium']}
+        
+        Question Types to Include: ${selectedTypes}
+        
+        Output JSON Schema:
+        [
+          {
+            "text": "Question stem here",
+            "type": "MC" | "TF" | "SHORT",
+            "options": ["Option A", "Option B", "Option C", "Option D"], // Only for MC (4 options). For TF/SHORT, omit or null.
+            "answer": "Correct Answer String",
+            "difficulty": "${difficulty || 'medium'}"
+          }
+        ]
+        
+        Rules:
+        1. STRICTLY adhere to the provided text.
+        2. For Multiple Choice (MC), provide strictly 4 options. The correct answer MUST be one of them.
+        3. For True/False (TF), 'options' should be null. 'answer' must be "True" or "False".
+        4. For Short Answer (SHORT), 'options' should be null. 'answer' is the correct term.
+        5. Return ONLY the JSON array.
+        `;
+        parts.push(generatePrompt);
+    }
+
+    if (pdf) {
+        parts.push({
+            inlineData: {
+                data: pdf,
+                mimeType: "application/pdf"
+            }
+        });
+    } else {
+        parts.push(`Source Text:\n${text}`);
+    }
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(parts);
         const response = await result.response;
         const textResponse = response.text();
         const jsonStr = textResponse.replace(/```json\n?|\n?```/g, '').trim();

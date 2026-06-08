@@ -57,10 +57,12 @@ export default function UploadPage() {
 
     // AI State
     const [aiText, setAiText] = useState('');
-    // const [aiApiKey, setAiApiKey] = useState(...) // Deprecated in favor of backend
     const [aiCount, setAiCount] = useState(5);
     const [aiTypes, setAiTypes] = useState<string[]>(['MCQ', 'TF', 'SHORT']);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [aiMode, setAiMode] = useState<'generate' | 'parse'>('generate');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [base64Pdf, setBase64Pdf] = useState<string | undefined>(undefined);
 
     // Common State
     const [topic, setTopic] = useState('');
@@ -70,6 +72,60 @@ export default function UploadPage() {
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
 
+
+    const handleFileChange = async (file: File) => {
+        setErrorMsg('');
+        if (file.size > 5 * 1024 * 1024) {
+            setErrorMsg("El archivo supera el límite de 5MB.");
+            setStatus('error');
+            return;
+        }
+
+        setSelectedFile(file);
+
+        if (file.name.endsWith('.txt')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setAiText(e.target?.result as string);
+                setBase64Pdf(undefined);
+            };
+            reader.readAsText(file);
+        } else if (file.name.endsWith('.pdf')) {
+            if (userProfile?.tier !== 'pro') {
+                setErrorMsg("La subida directa de PDFs es una función exclusiva para usuarios PRO. Puedes copiar y pegar el texto de tu PDF en la caja inferior de forma gratuita.");
+                setStatus('error');
+                setSelectedFile(null);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result as string;
+                const base64 = result.split(',')[1];
+                setBase64Pdf(base64);
+                setAiText(''); // Clear text so we use pdf instead
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setErrorMsg("Formato de archivo no soportado. Por favor, sube un archivo .pdf o .txt.");
+            setStatus('error');
+            setSelectedFile(null);
+        }
+    };
+
+    const triggerFileSelect = () => {
+        document.getElementById('ai-file-input')?.click();
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileChange(e.dataTransfer.files[0]);
+        }
+    };
 
     const handleParse = () => {
         const questions = parseGIFT(text, topic || 'General', difficulty);
@@ -93,7 +149,15 @@ export default function UploadPage() {
 
         try {
             // Pass empty string for API key as it's handled on backend
-            const generatedQuestions = await generateQuestions('', aiText, difficulty, aiCount, aiTypes);
+            const generatedQuestions = await generateQuestions(
+                '',
+                aiText,
+                difficulty,
+                aiCount,
+                aiTypes,
+                aiMode,
+                base64Pdf
+            );
 
             const questions: Question[] = generatedQuestions.map(gq => ({
                 id: crypto.randomUUID(),
@@ -330,9 +394,7 @@ export default function UploadPage() {
                             </button>
                         </div>
                     </div>
-                )}
-
-                {activeTab === 'ai' && (
+                )}                {activeTab === 'ai' && (
                     <div className="space-y-6 animate-fadeIn">
 
                         <div>
@@ -358,104 +420,214 @@ export default function UploadPage() {
                                 </p>
                             </div>
 
-                            {userProfile?.tier === 'pro' && (
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                        Upload Document (PDF/TXT)
-                                    </label>
-                                    <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center text-slate-500 hover:border-indigo-500 transition-colors cursor-pointer">
-                                        <p className="text-sm">Drag & Drop or Click to Upload</p>
-                                        <p className="text-xs mt-1 text-slate-400">Supported: .pdf, .txt, .docx (Max 10MB)</p>
-                                        {/* logic for file upload would go here - placeholder for now */}
+                            {/* Mode Toggle Selector */}
+                            <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl mb-6">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAiMode('generate');
+                                        setSelectedFile(null);
+                                        setBase64Pdf(undefined);
+                                        setAiText('');
+                                    }}
+                                    className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${aiMode === 'generate'
+                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                        }`}
+                                >
+                                    ✨ {t('Crear desde temario', { defaultValue: 'Crear desde temario' })}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAiMode('parse');
+                                        setSelectedFile(null);
+                                        setBase64Pdf(undefined);
+                                        setAiText('');
+                                    }}
+                                    className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${aiMode === 'parse'
+                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                        }`}
+                                >
+                                    📄 {t('Importar test existente', { defaultValue: 'Importar test existente' })}
+                                </button>
+                            </div>
+
+                            {/* Drag & Drop File Upload */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    {aiMode === 'parse' 
+                                        ? t('Subir cuestionario o examen (PDF/TXT)', { defaultValue: 'Subir cuestionario o examen (PDF/TXT)' })
+                                        : t('Subir temario o apuntes (PDF/TXT)', { defaultValue: 'Subir temario o apuntes (PDF/TXT)' })
+                                    }
+                                </label>
+                                <div
+                                    onClick={triggerFileSelect}
+                                    onDragOver={handleDragOver}
+                                    onDrop={handleDrop}
+                                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center text-slate-500 hover:border-indigo-500 hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-all cursor-pointer"
+                                >
+                                    <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        {t('Arrastra tu archivo aquí o haz clic para subir', { defaultValue: 'Arrastra tu archivo aquí o haz clic para subir' })}
+                                    </p>
+                                    <p className="text-xs mt-1 text-slate-400">
+                                        {t('Soportado: .txt o .pdf (PRO) - Máx. 5MB', { defaultValue: 'Soportado: .txt o .pdf (PRO) - Máx. 5MB' })}
+                                    </p>
+                                    <input
+                                        type="file"
+                                        id="ai-file-input"
+                                        accept=".pdf,.txt"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                handleFileChange(e.target.files[0]);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Selected File Details */}
+                            {selectedFile && (
+                                <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl mb-6 border border-slate-200/60 dark:border-slate-700/60">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="bg-indigo-50 dark:bg-indigo-950/40 p-2 rounded-lg">
+                                            <FileText className="w-5 h-5 text-indigo-500" />
+                                        </div>
+                                        <div className="text-left overflow-hidden">
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{selectedFile.name}</p>
+                                            <p className="text-xs text-slate-400">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        </div>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedFile(null);
+                                            setBase64Pdf(undefined);
+                                            setAiText('');
+                                        }}
+                                        className="text-xs text-red-500 hover:text-red-700 font-semibold px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                    >
+                                        {t('Eliminar', { defaultValue: 'Eliminar' })}
+                                    </button>
                                 </div>
                             )}
 
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                {t('upload.ai.sourceText')}
-                            </label>
-                            <textarea
-                                value={aiText}
-                                onChange={(e) => setAiText(e.target.value)}
-                                rows={8}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl p-4 text-sm focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-200"
-                                placeholder={t('upload.ai.sourcePlaceholder')}
-                            />
+                            {/* Text Area for copy/paste */}
+                            {!base64Pdf && (
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        {aiMode === 'parse'
+                                            ? t('Pegar preguntas del examen/test', { defaultValue: 'Pegar preguntas del examen/test' })
+                                            : t('upload.ai.sourceText')
+                                        }
+                                    </label>
+                                    <textarea
+                                        value={aiText}
+                                        onChange={(e) => setAiText(e.target.value)}
+                                        rows={8}
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl p-4 text-sm focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-200"
+                                        placeholder={aiMode === 'parse'
+                                            ? t('Pega aquí tus preguntas con sus opciones y respuestas (incluso si las soluciones están agrupadas al final)...', { defaultValue: 'Pega aquí tus preguntas con sus opciones y respuestas (incluso si las soluciones están agrupadas al final)...' })
+                                            : t('upload.ai.sourcePlaceholder')
+                                        }
+                                    />
+                                </div>
+                            )}
+
+                            {base64Pdf && (
+                                <div className="bg-indigo-50/55 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 rounded-xl p-4 mb-6 flex items-center gap-3">
+                                    <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 animate-pulse" />
+                                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                                        {t('Documento PDF listo. La IA extraerá y estructurará todas las preguntas de este archivo.', { defaultValue: 'Documento PDF listo. La IA extraerá y estructurará todas las preguntas de este archivo.' })}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                                {t('upload.ai.questionTypes')}
-                            </label>
-                            <div className="flex gap-4">
-                                <label className="flex items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+                        {aiMode === 'generate' ? (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                                        {t('upload.ai.questionTypes')}
+                                    </label>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={aiTypes.includes('MCQ')}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setAiTypes([...aiTypes, 'MCQ']);
+                                                    else setAiTypes(aiTypes.filter(t => t !== 'MCQ'));
+                                                }}
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                            />
+                                            <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('upload.ai.types.mcq')}</span>
+                                        </label>
+                                        <label className="flex items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={aiTypes.includes('TF')}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setAiTypes([...aiTypes, 'TF']);
+                                                    else setAiTypes(aiTypes.filter(t => t !== 'TF'));
+                                                }}
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                            />
+                                            <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('upload.ai.types.tf')}</span>
+                                        </label>
+                                        <label className="flex items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={aiTypes.includes('SHORT')}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setAiTypes([...aiTypes, 'SHORT']);
+                                                    else setAiTypes(aiTypes.filter(t => t !== 'SHORT'));
+                                                }}
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                            />
+                                            <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('upload.ai.types.sa')}</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        {t('upload.ai.count', { count: aiCount })}
+                                    </label>
                                     <input
-                                        type="checkbox"
-                                        checked={aiTypes.includes('MCQ')}
-                                        onChange={(e) => {
-                                            if (e.target.checked) setAiTypes([...aiTypes, 'MCQ']);
-                                            else setAiTypes(aiTypes.filter(t => t !== 'MCQ'));
-                                        }}
-                                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                        type="range"
+                                        min="1"
+                                        max="20"
+                                        value={aiCount}
+                                        onChange={(e) => setAiCount(parseInt(e.target.value))}
+                                        className="w-full accent-indigo-600 dark:accent-indigo-500"
                                     />
-                                    <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('upload.ai.types.mcq')}</span>
-                                </label>
-                                <label className="flex items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={aiTypes.includes('TF')}
-                                        onChange={(e) => {
-                                            if (e.target.checked) setAiTypes([...aiTypes, 'TF']);
-                                            else setAiTypes(aiTypes.filter(t => t !== 'TF'));
-                                        }}
-                                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                                    />
-                                    <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('upload.ai.types.tf')}</span>
-                                </label>
-                                <label className="flex items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={aiTypes.includes('SHORT')}
-                                        onChange={(e) => {
-                                            if (e.target.checked) setAiTypes([...aiTypes, 'SHORT']);
-                                            else setAiTypes(aiTypes.filter(t => t !== 'SHORT'));
-                                        }}
-                                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                                    />
-                                    <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('upload.ai.types.sa')}</span>
-                                </label>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl text-sm text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-800/80">
+                                💡 **{t('Modo Importación', { defaultValue: 'Modo Importación' })}:** {t('La IA identificará todas las preguntas, deducirá las respuestas correctas (asociando plantillas de soluciones si existen al final) y clasificará la dificultad de cada una de manera automática basándose en su complejidad.', { defaultValue: 'La IA identificará todas las preguntas, deducirá las respuestas correctas (asociando plantillas de soluciones si existen al final) y clasificará la dificultad de cada una de manera automática basándose en su complejidad.' })}
                             </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                {t('upload.ai.count', { count: aiCount })}
-                            </label>
-                            <input
-                                type="range"
-                                min="1"
-                                max="20"
-                                value={aiCount}
-                                onChange={(e) => setAiCount(parseInt(e.target.value))}
-                                className="w-full accent-indigo-600 dark:accent-indigo-500"
-                            />
-                        </div>
+                        )}
 
                         <div className="flex justify-end pt-4">
                             <button
                                 onClick={handleGenerate}
-                                disabled={isGenerating || !aiText || aiTypes.length === 0}
+                                disabled={isGenerating || (!aiText.trim() && !base64Pdf) || (aiMode === 'generate' && aiTypes.length === 0)}
                                 className="btn-primary flex items-center py-2.5 px-6 rounded-xl disabled:opacity-50"
                             >
                                 {isGenerating ? (
                                     <>
                                         <Sparkles className="w-4 h-4 mr-2 animate-spin" />
-                                        {t('upload.ai.generating')}
+                                        {aiMode === 'parse' ? t('Procesando examen...', { defaultValue: 'Procesando examen...' }) : t('upload.ai.generating')}
                                     </>
                                 ) : (
                                     <>
-                                        <Sparkles className="w-4 h-4 mr-2" />
-                                        {t('upload.ai.generate')}
+                                        {aiMode === 'parse' ? <FileText className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                                        {aiMode === 'parse' ? t('Importar preguntas con IA', { defaultValue: 'Importar preguntas con IA' }) : t('upload.ai.generate')}
                                     </>
                                 )}
                             </button>
