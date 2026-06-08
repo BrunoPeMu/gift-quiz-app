@@ -205,11 +205,12 @@ export const generateQuestions = functions
         
         CRITICAL RULES:
         1. Do NOT invent new questions. ONLY extract the questions that are explicitly present in the provided source.
-        2. Identify the correct answer for each question. The correct answer may be marked directly next to the question (e.g. bolded, with an asterisk *, or a checkmark), OR it may be listed at the end of the document in a "key/solutions" section (e.g., "1-A, 2-B, 3-C..." or "Soluciones: 1.a, 2.b..."). Match these answer keys to the extracted questions.
-        3. For Multiple Choice (MC), provide strictly 4 options. If the original question has fewer than 4 options (e.g. 3 options), generate plausible distractors to complete exactly 4 options. Make sure the correct answer matches one of the options.
+        2. Identify the correct answer for each question. The correct answer may be marked directly next to the question (e.g. bolded, with an asterisk *, or a checkmark), OR it may be listed at the end of the document in a "key/solutions" section. Match these answer keys to the extracted questions.
+        3. For Multiple Choice (MC), provide strictly 4 options. If the original question has fewer than 4 options (e.g. 3 options), generate plausible distractors to complete exactly 4 options. Make sure ALL 4 options are DISTINCT and UNIQUE. Do NOT duplicate the correct answer. Make sure the correct answer matches exactly one of the options.
         4. For True/False (TF) questions, 'options' must be null. The 'answer' must be "True" or "False".
         5. For Short Answer (SHORT) questions, 'options' must be null. The 'answer' is the correct term/phrase.
         6. Evaluate the difficulty of each question based on its cognitive complexity. Tag each question's difficulty individually as "easy", "medium", or "hard".
+        7. IMPORTANT: Do NOT remove the original question numbers. Always include the original question number at the beginning of the 'text' field (e.g., "1. What is...").
         
         Output JSON Schema:
         [
@@ -249,10 +250,11 @@ export const generateQuestions = functions
         CRITICAL RULES:
         1. Do NOT invent new questions. ONLY extract the questions explicitly present.
         2. Determine the correct answer for each question using the GLOBAL ANSWER KEY provided above. Match the question number or text to the key. If the key is empty or missing this question, try to infer the answer from the text itself.
-        3. For Multiple Choice (MC), provide strictly 4 options. If fewer than 4, generate plausible distractors. Make sure the correct answer matches one of the options.
+        3. For Multiple Choice (MC), provide strictly 4 options. If fewer than 4, generate plausible distractors. Make sure ALL 4 options are DISTINCT and UNIQUE. Do NOT duplicate the correct answer. Make sure the correct answer matches exactly one of the options.
         4. For True/False (TF) questions, 'options' must be null. The 'answer' must be "True" or "False".
         5. For Short Answer (SHORT) questions, 'options' must be null. The 'answer' is the correct term/phrase.
         6. Evaluate the difficulty of each question ("easy", "medium", or "hard").
+        7. IMPORTANT: Do NOT remove the original question numbers. Always include the original question number at the beginning of the 'text' field (e.g., "1. What is...").
         
         Output JSON Schema:
         [
