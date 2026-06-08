@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { getUserProgress, type TopicStats } from '../services/progressService';
 import { getTopicsData, getQuestions, addTopic, renameTopic as renameTopicService, migrateLegacyData } from '../services/questionService';
 import type { Question } from '../types';
-import { AdBanner } from '../components/AdBanner';
 import { RewardedVideo } from '../components/RewardedVideo';
 import { addFreeCredits } from '../services/userService';
 
@@ -784,8 +783,6 @@ export default function DashboardPage() {
             {/* Ad Placeholder - Only for Free Users */}
             {!userProfile?.isPremium && (
                 <div className="mt-8">
-                    <AdBanner />
-
                     {/* Rewarded Video CTA */}
                     <div className="mt-6 card p-4 flex items-center justify-between border-dashed">
                         <div className="flex items-center space-x-3">

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Navbar } from './Navbar';
-import { AdBanner } from './AdBanner';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -21,9 +20,6 @@ export function Layout({ children }: LayoutProps) {
                 <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
                     {children}
                 </main>
-                <div className="max-w-[1800px] mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
-                    <AdBanner />
-                </div>
             </div>
         </div>
     );

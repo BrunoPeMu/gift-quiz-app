@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { saveProgress } from '../services/progressService';
 import type { QuizState } from '../types';
-import { AdBanner } from '../components/AdBanner';
 
 export default function ResultsPage() {
     const location = useLocation();
@@ -105,9 +104,6 @@ export default function ResultsPage() {
                 </div>
             </div>
 
-            <div className="mb-8 rounded-xl overflow-hidden">
-                <AdBanner />
-            </div>
 
             <div className="space-y-6">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white px-2">
