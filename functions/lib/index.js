@@ -11,8 +11,8 @@ const db = admin.firestore();
 // Models (Mapping User Request to Real/Available Models)
 // Note: "Gemini 2.5 Flash Lite" and "Gemini 3.0 Flash" are mapped to currently reliable identifiers.
 // Adjust these strings as the actual models become available.
-const MODEL_LITE = "gemini-2.0-flash"; // Placeholder for "Gemini 2.5 Flash Lite"
-const MODEL_PRO = "gemini-2.0-flash"; // Placeholder for "Gemini 3.0 Flash" (or experimental pro versions)
+const MODEL_LITE = "gemini-3.1-flash-lite"; // Updated to stable 2026 model
+const MODEL_PRO = "gemini-3.5-flash"; // Updated to stable 2026 model
 const TIERS = {
     guest: {
         name: 'guest',
