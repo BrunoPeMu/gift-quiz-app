@@ -103,8 +103,9 @@ export default function ConfigPage() {
     const filteredTopics = config.subject === 'All'
         ? topics
         : topics.filter(topicName => {
+            if (topicName === 'All') return true;
             const topicSubj = topicSubjectMap[topicName];
-            return topicSubj === config.subject || !topicSubj || topicSubj === 'Uncategorized';
+            return topicSubj === config.subject;
         });
 
     // Reset topic to 'All' when subject changes
