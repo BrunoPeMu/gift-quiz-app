@@ -75,8 +75,8 @@ export default function UploadPage() {
 
     const handleFileChange = async (file: File) => {
         setErrorMsg('');
-        if (file.size > 5 * 1024 * 1024) {
-            setErrorMsg("El archivo supera el límite de 5MB.");
+        if (file.size > 7 * 1024 * 1024) {
+            setErrorMsg("El archivo supera el límite de 7MB.");
             setStatus('error');
             return;
         }
@@ -473,7 +473,7 @@ export default function UploadPage() {
                                         {t('Arrastra tu archivo aquí o haz clic para subir', { defaultValue: 'Arrastra tu archivo aquí o haz clic para subir' })}
                                     </p>
                                     <p className="text-xs mt-1 text-slate-400">
-                                        {t('Soportado: .txt o .pdf (PRO) - Máx. 5MB', { defaultValue: 'Soportado: .txt o .pdf (PRO) - Máx. 5MB' })}
+                                        {t('Soportado: .txt o .pdf (PRO) - Máx. 7MB', { defaultValue: 'Soportado: .txt o .pdf (PRO) - Máx. 7MB' })}
                                     </p>
                                     <input
                                         type="file"

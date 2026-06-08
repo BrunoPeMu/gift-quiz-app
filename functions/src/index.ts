@@ -165,10 +165,10 @@ export const generateQuestions = functions.https.onCall(async (data: GenerateQue
             `Text too long for ${tier.toUpperCase()} tier. Limit is ${config.maxContextChars} characters.`
         );
     }
-    if (pdf && pdf.length > 7 * 1024 * 1024) { // ~5MB file limit (base64 is ~1.37 times larger)
+    if (pdf && pdf.length > 9.6 * 1024 * 1024) { // ~7MB file limit (base64 is ~1.37 times larger)
         throw new functions.https.HttpsError(
             "resource-exhausted",
-            "PDF file too large. Limit is 5MB."
+            "PDF file too large. Limit is 7MB."
         );
     }
 
