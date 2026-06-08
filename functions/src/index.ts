@@ -12,7 +12,6 @@ const db = admin.firestore();
 // Note: "Gemini 2.5 Flash Lite" and "Gemini 3.0 Flash" are mapped to currently reliable identifiers.
 // Adjust these strings as the actual models become available.
 const MODEL_LITE = "gemini-3.1-flash-lite"; // Updated to stable 2026 model
-const MODEL_PRO = "gemini-3.5-flash";  // Updated to stable 2026 model
 
 interface TierConfig {
     name: string;
@@ -51,7 +50,7 @@ const TIERS: Record<string, TierConfig> = {
     },
     pro: {
         name: 'pro',
-        model: MODEL_PRO,
+        model: MODEL_LITE, // Changed to Lite to save costs on large parses
         maxContextChars: 100000, // Long context
         dailyCredits: 999, // Effectively unlimited
         allowRollover: false,
@@ -64,10 +63,11 @@ const TIERS: Record<string, TierConfig> = {
 interface GenerateQuestionsData {
     text?: string;
     pdf?: string;
-    mode?: 'generate' | 'parse';
+    mode?: 'generate' | 'parse' | 'extract_key' | 'parse_with_key';
     difficulty?: 'easy' | 'medium' | 'hard';
     count?: number;
     types?: string[];
+    answerKey?: string;
 }
 
 // --- Helpers ---
@@ -137,7 +137,7 @@ const checkAndDeductCredits = async (uid: string, tier: string): Promise<boolean
 
 export const generateQuestions = functions
     .runWith({
-        timeoutSeconds: 120,
+        timeoutSeconds: 540,
         memory: "1GB"
     })
     .https.onCall(async (data: GenerateQuestionsData, context: functions.https.CallableContext) => {
@@ -145,7 +145,7 @@ export const generateQuestions = functions
     const apiKey = getApiKey();
     if (!apiKey) throw new functions.https.HttpsError("internal", "Server configuration error (API Key)");
 
-    const { text, pdf, mode = 'generate', difficulty, count, types } = data;
+    const { text, pdf, mode = 'generate', difficulty, count, types, answerKey } = data;
     if (!text && !pdf) {
         throw new functions.https.HttpsError("invalid-argument", "Either source text or PDF is required");
     }
@@ -209,7 +209,7 @@ export const generateQuestions = functions
         3. For Multiple Choice (MC), provide strictly 4 options. If the original question has fewer than 4 options (e.g. 3 options), generate plausible distractors to complete exactly 4 options. Make sure the correct answer matches one of the options.
         4. For True/False (TF) questions, 'options' must be null. The 'answer' must be "True" or "False".
         5. For Short Answer (SHORT) questions, 'options' must be null. The 'answer' is the correct term/phrase.
-        6. Evaluate the difficulty of each question based on its cognitive complexity (e.g., simple factual recall is "easy", conceptual application is "medium", deep analysis/nuance/complex problem solving is "hard"). Tag each question's difficulty individually as "easy", "medium", or "hard".
+        6. Evaluate the difficulty of each question based on its cognitive complexity. Tag each question's difficulty individually as "easy", "medium", or "hard".
         
         Output JSON Schema:
         [
@@ -225,6 +225,49 @@ export const generateQuestions = functions
         Return ONLY the raw JSON array.
         `;
         parts.push(parsePrompt);
+    } else if (mode === 'extract_key') {
+        const extractKeyPrompt = `
+        Scan the entire document carefully. Your ONLY task is to identify and extract the correct answers for the questions.
+        The answers might be located at the very end of the document in a key/solutions section, they might be marked inline (e.g., bolded, with an asterisk), or they might immediately follow the question.
+        
+        Build a global answer key.
+        Return ONLY a JSON object where the key is the question number (e.g., "1", "2") or a short snippet of the question if unnumbered, and the value is the correct answer option or text.
+        If no answers can be found anywhere in the document, return an empty object {}.
+        DO NOT extract the questions themselves, ONLY the answer key map.
+        `;
+        parts.push(extractKeyPrompt);
+    } else if (mode === 'parse_with_key') {
+        const parseWithKeyPrompt = `
+        You are an expert assistant specialized in parsing existing test questionnaires.
+        You are provided with a text block and a global answer key JSON.
+        
+        GLOBAL ANSWER KEY:
+        ${answerKey || "{}"}
+        
+        Your objective is to extract all the questions from the text block.
+        
+        CRITICAL RULES:
+        1. Do NOT invent new questions. ONLY extract the questions explicitly present.
+        2. Determine the correct answer for each question using the GLOBAL ANSWER KEY provided above. Match the question number or text to the key. If the key is empty or missing this question, try to infer the answer from the text itself.
+        3. For Multiple Choice (MC), provide strictly 4 options. If fewer than 4, generate plausible distractors. Make sure the correct answer matches one of the options.
+        4. For True/False (TF) questions, 'options' must be null. The 'answer' must be "True" or "False".
+        5. For Short Answer (SHORT) questions, 'options' must be null. The 'answer' is the correct term/phrase.
+        6. Evaluate the difficulty of each question ("easy", "medium", or "hard").
+        
+        Output JSON Schema:
+        [
+          {
+            "text": "Question stem here",
+            "type": "MC" | "TF" | "SHORT",
+            "options": ["Option A", "Option B", "Option C", "Option D"], // Only for MC.
+            "answer": "Correct Answer String",
+            "difficulty": "easy" | "medium" | "hard"
+          }
+        ]
+        
+        Return ONLY the raw JSON array.
+        `;
+        parts.push(parseWithKeyPrompt);
     } else {
         // Mode 'generate' (standard syllabus-based generation)
         const difficultyPrompts = {

@@ -25,9 +25,10 @@ export async function generateQuestions(
     difficulty: 'easy' | 'medium' | 'hard',
     count: number,
     types: string[] = ['MCQ', 'TF', 'SHORT'],
-    mode: 'generate' | 'parse' = 'generate',
-    pdf?: string
-): Promise<GeneratedQuestion[]> {
+    mode: 'generate' | 'parse' | 'extract_key' | 'parse_with_key' = 'generate',
+    pdf?: string,
+    answerKey?: string
+): Promise<any> {
 
     // Logic moved to backend.
     const generate = httpsCallable<any, GeneratedQuestion[]>(functions, 'generateQuestions');
@@ -39,7 +40,8 @@ export async function generateQuestions(
             mode,
             difficulty,
             count,
-            types
+            types,
+            answerKey
         });
         return result.data;
     } catch (error: any) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileText, Check, AlertCircle, Sparkles, Layout, Save, BookOpen, Layers } from 'lucide-react';
+import { FileText, Check, AlertCircle, Sparkles, Layout, Save, BookOpen, Layers, Edit2, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { parseGIFT } from '../lib/giftParser';
 import { getTopicsData, saveQuestions, addSubject, addTopic } from '../services/questionService';
@@ -7,7 +7,32 @@ import { generateQuestions } from '../services/aiService';
 import { useAuth } from '../contexts/AuthContext';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
+import * as pdfjsLib from 'pdfjs-dist';
 
+// Configurar el worker de PDF.js usando CDN para evitar problemas de empaquetado en Vite
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+const chunkText = (text: string, maxChars: number = 15000): string[] => {
+    if (!text) return [];
+    if (text.length <= maxChars) return [text];
+    
+    const chunks: string[] = [];
+    let currentChunk = '';
+    const paragraphs = text.split('\\n\\n');
+    
+    for (const paragraph of paragraphs) {
+        if (currentChunk.length + paragraph.length > maxChars && currentChunk.length > 0) {
+            chunks.push(currentChunk);
+            currentChunk = paragraph;
+        } else {
+            currentChunk += (currentChunk.length > 0 ? '\\n\\n' : '') + paragraph;
+        }
+    }
+    if (currentChunk) {
+        chunks.push(currentChunk);
+    }
+    return chunks;
+};
 export default function UploadPage() {
     const { t } = useTranslation();
     const { currentUser, userProfile } = useAuth();
@@ -62,7 +87,8 @@ export default function UploadPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [aiMode, setAiMode] = useState<'generate' | 'parse'>('generate');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [base64Pdf, setBase64Pdf] = useState<string | undefined>(undefined);
+    const [isExtractingPdf, setIsExtractingPdf] = useState(false);
+    const [progress, setProgress] = useState<{phase?: string, current: number, total: number} | null>(null);
 
     // Common State
     const [topic, setTopic] = useState('');
@@ -71,6 +97,7 @@ export default function UploadPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
 
     const handleFileChange = async (file: File) => {
@@ -87,24 +114,45 @@ export default function UploadPage() {
             const reader = new FileReader();
             reader.onload = (e) => {
                 setAiText(e.target?.result as string);
-                setBase64Pdf(undefined);
             };
             reader.readAsText(file);
         } else if (file.name.endsWith('.pdf')) {
             if (userProfile?.tier !== 'pro') {
-                setErrorMsg("La subida directa de PDFs es una función exclusiva para usuarios PRO. Puedes copiar y pegar el texto de tu PDF en la caja inferior de forma gratuita.");
+                setErrorMsg("La subida de PDFs es una función exclusiva para usuarios PRO. Puedes copiar y pegar el texto en la caja inferior.");
                 setStatus('error');
                 setSelectedFile(null);
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = e.target?.result as string;
-                const base64 = result.split(',')[1];
-                setBase64Pdf(base64);
-                setAiText(''); // Clear text so we use pdf instead
-            };
-            reader.readAsDataURL(file);
+            
+            setIsExtractingPdf(true);
+            setAiText('');
+            
+            try {
+                // Leer archivo como ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                let extractedText = '';
+                
+                // Extraer texto página por página
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items
+                        .map((item: any) => item.str)
+                        .join(' ');
+                    extractedText += pageText + '\\n\\n';
+                }
+                
+                setAiText(extractedText.trim());
+            } catch (err: any) {
+                console.error("Error al extraer texto del PDF:", err);
+                setErrorMsg("No se pudo extraer el texto del PDF. Asegúrate de que no está protegido o escaneado como imagen.");
+                setStatus('error');
+                setSelectedFile(null);
+            } finally {
+                setIsExtractingPdf(false);
+            }
+            
         } else {
             setErrorMsg("Formato de archivo no soportado. Por favor, sube un archivo .pdf o .txt.");
             setStatus('error');
@@ -146,39 +194,121 @@ export default function UploadPage() {
         setIsGenerating(true);
         setErrorMsg('');
         setStatus('idle');
+        setPreview([]); // Clear early so we can accumulate
 
         try {
-            // Pass empty string for API key as it's handled on backend
-            const generatedQuestions = await generateQuestions(
-                '',
-                aiText,
-                difficulty,
-                aiCount,
-                aiTypes,
-                aiMode,
-                base64Pdf
-            );
+            let textChunks = [aiText];
+            let globalAnswerKey = "";
 
-            const questions: Question[] = generatedQuestions.map(gq => ({
-                id: crypto.randomUUID(),
-                text: gq.text,
-                type: gq.type,
-                options: gq.options || [],
-                answer: gq.answer,
-                topic: topic || 'General',
-                subject: subject || undefined,
-                difficulty: gq.difficulty === 'easy' || gq.difficulty === 'medium' || gq.difficulty === 'hard' ? gq.difficulty : difficulty,
-                disabled: false,
-                createdAt: Date.now()
-            }));
+            // Phase 1: Si es modo parse y es muy largo, buscamos la plantilla de respuestas primero
+            if (aiMode === 'parse' && aiText.length > 15000) {
+                setProgress({ phase: t('Buscando soluciones (Fase 1/2)...', { defaultValue: 'Buscando soluciones (Fase 1/2)...' }), current: 1, total: 1 });
+                
+                let retries = 0;
+                let keySuccess = false;
+                while (!keySuccess && retries <= 3) {
+                    try {
+                        const keyResult = await generateQuestions(
+                            '',
+                            aiText,
+                            difficulty,
+                            aiCount,
+                            aiTypes,
+                            'extract_key',
+                            undefined
+                        );
+                        globalAnswerKey = JSON.stringify(keyResult);
+                        keySuccess = true;
+                    } catch (err: any) {
+                        retries++;
+                        if (retries > 3) throw new Error("No se pudo extraer la plantilla de respuestas: " + err.message);
+                        console.warn(`Extract key failed: ${err.message}. Retrying... (${retries}/3)`);
+                        await new Promise(r => setTimeout(r, 3000));
+                    }
+                }
+                
+                // Dividimos el texto para procesarlo por lotes
+                textChunks = chunkText(aiText, 15000);
+            } else if (aiMode === 'generate') {
+                // Modo generación normal: dividimos el texto si es necesario
+                textChunks = chunkText(aiText, 15000);
+            }
 
-            setPreview(questions);
+            let allQuestions: Question[] = [];
+            
+            for (let i = 0; i < textChunks.length; i++) {
+                if (textChunks.length > 1) {
+                    setProgress({ 
+                        phase: aiMode === 'parse' ? t('Extrayendo preguntas (Fase 2/2)...', { defaultValue: 'Extrayendo preguntas (Fase 2/2)...' }) : t('Generando preguntas...', { defaultValue: 'Generando preguntas...' }), 
+                        current: i + 1, 
+                        total: textChunks.length 
+                    });
+                } else {
+                    setProgress({ 
+                        phase: aiMode === 'parse' ? t('Procesando examen...', { defaultValue: 'Procesando examen...' }) : t('Generando preguntas...', { defaultValue: 'Generando preguntas...' }), 
+                        current: 1, 
+                        total: 1 
+                    });
+                }
+
+                // Para 'generate', pedimos una fracción del total.
+                const chunkCount = aiMode === 'generate' 
+                    ? Math.max(1, Math.floor(aiCount / textChunks.length)) 
+                    : aiCount;
+                    
+                const callMode = (aiMode === 'parse' && globalAnswerKey) ? 'parse_with_key' : aiMode;
+
+                let retries = 0;
+                const maxRetries = 3;
+                let chunkSuccess = false;
+                
+                while (!chunkSuccess && retries <= maxRetries) {
+                    try {
+                        const generatedQuestions = await generateQuestions(
+                            '',
+                            textChunks[i],
+                            difficulty,
+                            chunkCount,
+                            aiTypes,
+                            callMode,
+                            undefined,
+                            globalAnswerKey || undefined
+                        );
+
+                        // Mapear los resultados
+                        const mappedQuestions: Question[] = generatedQuestions.map((gq: any) => ({
+                            id: crypto.randomUUID(),
+                            text: gq.text,
+                            type: gq.type,
+                            options: gq.options || [],
+                            answer: gq.answer,
+                            topic: topic || 'General',
+                            subject: subject || undefined,
+                            difficulty: gq.difficulty === 'easy' || gq.difficulty === 'medium' || gq.difficulty === 'hard' ? gq.difficulty : difficulty,
+                            disabled: false,
+                            createdAt: Date.now()
+                        }));
+
+                        allQuestions = [...allQuestions, ...mappedQuestions];
+                        setPreview([...allQuestions]); // Actualizar UI progresivamente
+                        chunkSuccess = true;
+                    } catch (err: any) {
+                        retries++;
+                        if (retries > maxRetries) {
+                            throw err;
+                        }
+                        console.warn(`Chunk ${i+1} failed: ${err.message}. Retrying in 3s... (${retries}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                }
+            }
         } catch (error: any) {
             console.error("Generation failed", error);
             setErrorMsg(error.message || t('upload.ai.error'));
             setStatus('error');
         } finally {
             setIsGenerating(false);
+            setProgress(null);
         }
     };
 
@@ -427,7 +557,6 @@ export default function UploadPage() {
                                     onClick={() => {
                                         setAiMode('generate');
                                         setSelectedFile(null);
-                                        setBase64Pdf(undefined);
                                         setAiText('');
                                     }}
                                     className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${aiMode === 'generate'
@@ -442,7 +571,6 @@ export default function UploadPage() {
                                     onClick={() => {
                                         setAiMode('parse');
                                         setSelectedFile(null);
-                                        setBase64Pdf(undefined);
                                         setAiText('');
                                     }}
                                     className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${aiMode === 'parse'
@@ -505,7 +633,6 @@ export default function UploadPage() {
                                         type="button"
                                         onClick={() => {
                                             setSelectedFile(null);
-                                            setBase64Pdf(undefined);
                                             setAiText('');
                                         }}
                                         className="text-xs text-red-500 hover:text-red-700 font-semibold px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
@@ -516,14 +643,20 @@ export default function UploadPage() {
                             )}
 
                             {/* Text Area for copy/paste */}
-                            {!base64Pdf && (
-                                <div className="mb-6">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                        {aiMode === 'parse'
-                                            ? t('Pegar preguntas del examen/test', { defaultValue: 'Pegar preguntas del examen/test' })
-                                            : t('upload.ai.sourceText')
-                                        }
-                                    </label>
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    {aiMode === 'parse'
+                                        ? t('Pegar preguntas del examen/test o revisar texto extraído', { defaultValue: 'Pegar preguntas del examen/test o revisar texto extraído' })
+                                        : t('upload.ai.sourceText')
+                                    }
+                                </label>
+                                {isExtractingPdf ? (
+                                    <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 min-h-[160px]">
+                                        <Sparkles className="w-6 h-6 animate-spin text-indigo-500 mb-3" />
+                                        <p className="text-sm font-medium">{t('Extrayendo texto del PDF...', { defaultValue: 'Extrayendo texto del PDF...' })}</p>
+                                        <p className="text-xs mt-1 text-slate-400">{t('Esto tomará solo unos segundos.', { defaultValue: 'Esto tomará solo unos segundos.' })}</p>
+                                    </div>
+                                ) : (
                                     <textarea
                                         value={aiText}
                                         onChange={(e) => setAiText(e.target.value)}
@@ -534,17 +667,8 @@ export default function UploadPage() {
                                             : t('upload.ai.sourcePlaceholder')
                                         }
                                     />
-                                </div>
-                            )}
-
-                            {base64Pdf && (
-                                <div className="bg-indigo-50/55 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 rounded-xl p-4 mb-6 flex items-center gap-3">
-                                    <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 animate-pulse" />
-                                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                                        {t('Documento PDF listo. La IA extraerá y estructurará todas las preguntas de este archivo.', { defaultValue: 'Documento PDF listo. La IA extraerá y estructurará todas las preguntas de este archivo.' })}
-                                    </p>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
 
                         {aiMode === 'generate' ? (
@@ -616,13 +740,16 @@ export default function UploadPage() {
                         <div className="flex justify-end pt-4">
                             <button
                                 onClick={handleGenerate}
-                                disabled={isGenerating || (!aiText.trim() && !base64Pdf) || (aiMode === 'generate' && aiTypes.length === 0)}
+                                disabled={isGenerating || isExtractingPdf || (!aiText.trim()) || (aiMode === 'generate' && aiTypes.length === 0)}
                                 className="btn-primary flex items-center py-2.5 px-6 rounded-xl disabled:opacity-50"
                             >
                                 {isGenerating ? (
                                     <>
                                         <Sparkles className="w-4 h-4 mr-2 animate-spin" />
-                                        {aiMode === 'parse' ? t('Procesando examen...', { defaultValue: 'Procesando examen...' }) : t('upload.ai.generating')}
+                                        {progress?.phase && <span className="mr-2 font-medium">{progress.phase}</span>}
+                                        {progress && progress.total > 1 && (
+                                            <span>({progress.current}/{progress.total})</span>
+                                        )}
                                     </>
                                 ) : (
                                     <>
@@ -666,6 +793,18 @@ export default function UploadPage() {
             {/* Preview Section */}
             {preview.length > 0 && (
                 <div className="mt-8 animate-fadeIn">
+                    <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start">
+                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 mr-3 flex-shrink-0" />
+                        <div>
+                            <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                {t('Revisa las preguntas antes de guardar', { defaultValue: 'Revisa las preguntas antes de guardar' })}
+                            </h4>
+                            <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
+                                {t('La Inteligencia Artificial puede cometer errores o inventar respuestas. Por favor, usa los botones de "Editar" y "Eliminar" en cada tarjeta para asegurar la calidad de tus preguntas.', { defaultValue: 'La Inteligencia Artificial puede cometer errores o inventar respuestas. Por favor, usa los botones de "Editar" y "Eliminar" en cada tarjeta para asegurar la calidad de tus preguntas.' })}
+                            </p>
+                        </div>
+                    </div>
+
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                             {t('upload.preview')} <span className="text-slate-500 font-normal ml-2">({preview.length} {t('upload.questionsParsed')})</span>
@@ -682,19 +821,72 @@ export default function UploadPage() {
 
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                         {preview.map((q, i) => (
-                            <div key={i} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors first:rounded-t-xl last:rounded-b-xl">
-                                <div className="flex items-start justify-between mb-2">
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
-                                        {q.type}
-                                    </span>
-                                    <span className="text-xs text-slate-400 capitalize">{q.difficulty}</span>
+                            editingIndex === i ? (
+                                <div key={i} className="p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 bg-slate-50 dark:bg-slate-800/80">
+                                    <QuestionEditor
+                                        initialQuestion={q}
+                                        onSave={(partial) => {
+                                            const updatedQ = { ...q, ...partial };
+                                            const newPreview = [...preview];
+                                            newPreview[i] = updatedQ;
+                                            setPreview(newPreview);
+                                            setEditingIndex(null);
+                                        }}
+                                        onCancel={() => setEditingIndex(null)}
+                                        hideCodeMode={true}
+                                    />
                                 </div>
-                                <p className="font-medium text-slate-900 dark:text-white mb-2">{q.text}</p>
-                                <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
-                                    <span className="font-semibold text-slate-800 dark:text-slate-200 mr-2">{t('upload.answer')}:</span>
-                                    {String(q.answer)}
+                            ) : (
+                                <div key={i} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors first:rounded-t-xl last:rounded-b-xl group relative">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                                                {q.type}
+                                            </span>
+                                            <span className="text-xs text-slate-400 capitalize">{q.difficulty}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => setEditingIndex(i)}
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-colors"
+                                                title={t('Editar')}
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    const newPreview = [...preview];
+                                                    newPreview.splice(i, 1);
+                                                    setPreview(newPreview);
+                                                }}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
+                                                title={t('Eliminar')}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="font-medium text-slate-900 dark:text-white mb-2 pr-12">{q.text}</p>
+                                    
+                                    {/* Mapear las opciones si es test */}
+                                    {q.options && q.options.length > 0 && (
+                                        <div className="space-y-1 mb-3 pl-2">
+                                            {q.options.map((opt, optIndex) => (
+                                                <div key={optIndex} className={`text-sm flex items-start gap-2 ${opt === q.answer ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                    <span>{String.fromCharCode(65 + optIndex)}.</span>
+                                                    <span>{opt}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                                        <span className="font-semibold text-slate-800 dark:text-slate-200 mr-2">{t('upload.answer')}:</span>
+                                        {String(q.answer)}
+                                    </div>
                                 </div>
-                            </div>
+                            )
                         ))}
                     </div>
                 </div>
