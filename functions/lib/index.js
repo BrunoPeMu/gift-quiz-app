@@ -126,8 +126,8 @@ exports.generateQuestions = functions.https.onCall(async (data, context) => {
     if (text && text.length > config.maxContextChars) {
         throw new functions.https.HttpsError("resource-exhausted", `Text too long for ${tier.toUpperCase()} tier. Limit is ${config.maxContextChars} characters.`);
     }
-    if (pdf && pdf.length > 7 * 1024 * 1024) { // ~5MB file limit (base64 is ~1.37 times larger)
-        throw new functions.https.HttpsError("resource-exhausted", "PDF file too large. Limit is 5MB.");
+    if (pdf && pdf.length > 9.6 * 1024 * 1024) { // ~7MB file limit (base64 is ~1.37 times larger)
+        throw new functions.https.HttpsError("resource-exhausted", "PDF file too large. Limit is 7MB.");
     }
     // 3. Credit Check (Skip for guests in this simple impl, or rely on client session limits)
     if (uid) {
