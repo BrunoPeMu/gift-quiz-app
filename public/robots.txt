@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /manage
+Disallow: /profile
+Disallow: /setup
+Disallow: /upload
+Disallow: /quiz
+Disallow: /results
+Disallow: /login
+
+Sitemap: https://flashtests.app/sitemap.xml

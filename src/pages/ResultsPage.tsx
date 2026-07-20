@@ -1,16 +1,19 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { CheckCircle, XCircle, RotateCcw, Home, Award } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Home, Award, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { saveProgress } from '../services/progressService';
-import type { QuizState } from '../types';
+import { ShareModal } from '../components/ShareModal';
+import type { QuizState, QuizConfig } from '../types';
 
 export default function ResultsPage() {
     const location = useLocation();
     const { t } = useTranslation();
     const { currentUser } = useAuth();
     const result = location.state?.result as QuizState;
+    const config = location.state?.config as QuizConfig;
+    const [showShareModal, setShowShareModal] = useState(false);
 
     const percentage = result ? Math.round((result.score / result.questions.length) * 100) : 0;
     const isPerfect = percentage === 100;
@@ -85,7 +88,7 @@ export default function ResultsPage() {
                         {t('results.summary', { score: result.score, total: result.questions.length })}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                         <Link
                             to="/config"
                             className="flex items-center justify-center px-4 py-3 rounded-xl border border-transparent text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/40 transition-colors"
@@ -93,6 +96,15 @@ export default function ResultsPage() {
                             <RotateCcw className="w-4 h-4 mr-2" />
                             {t('results.tryAgain')}
                         </Link>
+                        {config && (
+                            <button
+                                onClick={() => setShowShareModal(true)}
+                                className="flex items-center justify-center px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                <Share2 className="w-4 h-4 mr-2" />
+                                Compartir
+                            </button>
+                        )}
                         <Link
                             to="/"
                             className="btn-primary py-3 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-500/20"
@@ -168,6 +180,16 @@ export default function ResultsPage() {
                     );
                 })}
             </div>
+
+            {config && result && currentUser && (
+                <ShareModal
+                    isOpen={showShareModal}
+                    onClose={() => setShowShareModal(false)}
+                    config={config}
+                    questions={result.questions}
+                    creatorId={currentUser.uid}
+                />
+            )}
         </div>
     );
 }

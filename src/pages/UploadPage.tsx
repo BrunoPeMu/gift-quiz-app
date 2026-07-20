@@ -1,10 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileText, Check, AlertCircle, Sparkles, Layout, Save, BookOpen, Layers, Edit2, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Check, AlertCircle, Sparkles, Layout, Save, BookOpen, Layers, Edit2, Trash2, Crown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { parseGIFT } from '../lib/giftParser';
 import { getTopicsData, saveQuestions, addSubject, addTopic } from '../services/questionService';
+import { CreditProgressBar } from '../components/CreditProgressBar';
+import { AI_BASIC_MONTHLY_LIMIT } from '../config/featureFlags';
 import { generateQuestions } from '../services/aiService';
 import { useAuth } from '../contexts/AuthContext';
+import { isAiBlocked } from '../config/featureFlags';
+import { allowLocalAction } from '../utils/antiAbuse';
 import type { Question } from '../types';
 import { QuestionEditor } from '../components/QuestionEditor';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -35,7 +40,8 @@ const chunkText = (text: string, maxChars: number = 15000): string[] => {
 };
 export default function UploadPage() {
     const { t } = useTranslation();
-    const { currentUser, userProfile } = useAuth();
+    const navigate = useNavigate();
+    const { currentUser, userProfile, refreshProfile } = useAuth();
     const [activeTab, setActiveTab] = useState<'visual' | 'manual' | 'ai'>('visual');
     const [availableTopics, setAvailableTopics] = useState<{ name: string, subject?: string }[]>([]);
 
@@ -44,16 +50,12 @@ export default function UploadPage() {
     const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
 
     useEffect(() => {
-        if (currentUser && currentUser.uid !== 'guest') {
-            getTopicsData(currentUser.uid).then(data => {
-                setAvailableTopics(data);
-                const subjects = Array.from(new Set(data.map(t => t.subject || 'Uncategorized'))).filter(s => s !== 'Uncategorized');
-                setAvailableSubjects(subjects as string[]);
-            }).catch(console.error);
-        } else {
-            setAvailableTopics([]);
-            setAvailableSubjects([]);
-        }
+        const uid = currentUser?.uid || 'guest';
+        getTopicsData(uid).then(data => {
+            setAvailableTopics(data);
+            const subjects = Array.from(new Set(data.map(t => t.subject || 'Uncategorized'))).filter(s => s !== 'Uncategorized');
+            setAvailableSubjects(subjects as string[]);
+        }).catch(console.error);
     }, [currentUser]);
 
     // Filter topics by selected subject
@@ -184,8 +186,26 @@ export default function UploadPage() {
     };
 
     const handleGenerate = async () => {
+        // Bloqueo para tiers gratuitos y usuarios sin cookies personalizadas
+        if (isAiBlocked(userProfile?.tier, userProfile?.personalizedAds)) {
+            const msg = userProfile?.personalizedAds === false
+                ? 'La IA no está disponible con cookies limitadas. Acepta publicidad personalizada o suscríbete a PRO.'
+                : t('upload.ai.locked.error', { defaultValue: 'La generación con IA está temporalmente desactivada para usuarios gratuitos. Hazte BASIC o PRO para continuar.' });
+            setErrorMsg(msg);
+            setStatus('error');
+            return;
+        }
+
+        // Anti-abuse local: solo cuenta clics del usuario, no llamadas internas
+        const uiGuard = allowLocalAction('ai_generate_click', 500, 30, 5 * 60 * 1000);
+        if (!uiGuard.ok) {
+            setErrorMsg(t('upload.ai.tooFast', { defaultValue: 'Espera un momento entre generaciones.' }));
+            setStatus('error');
+            return;
+        }
+
         // Check credits locally for fast feedback (optional)
-        if (userProfile?.credits === 0 && userProfile.tier !== 'pro') {
+        if (userProfile?.credits === 0 && userProfile.tier !== 'pro' && userProfile.tier !== 'basic') {
             setErrorMsg("Insufficient credits. Please upgrade or wait for daily reset.");
             setStatus('error');
             return;
@@ -209,7 +229,7 @@ export default function UploadPage() {
                 while (!keySuccess && retries <= 3) {
                     try {
                         const keyResult = await generateQuestions(
-                            '',
+                            userProfile?.tier,
                             aiText,
                             difficulty,
                             aiCount,
@@ -265,7 +285,7 @@ export default function UploadPage() {
                 while (!chunkSuccess && retries <= maxRetries) {
                     try {
                         const generatedQuestions = await generateQuestions(
-                            '',
+                            userProfile?.tier,
                             textChunks[i],
                             difficulty,
                             chunkCount,
@@ -302,9 +322,19 @@ export default function UploadPage() {
                     }
                 }
             }
+            // Refrescar perfil para actualizar contadores
+            await refreshProfile();
         } catch (error: any) {
             console.error("Generation failed", error);
-            setErrorMsg(error.message || t('upload.ai.error'));
+            if (error?.message === 'AI_RATE_LIMITED') {
+                setErrorMsg('Has hecho demasiadas peticiones seguidas. Espera un momento antes de volver a generar.');
+            } else if (error?.message === 'AI_GENERATION_BLOCKED') {
+                setErrorMsg(t('upload.ai.locked.error', { defaultValue: 'La generación con IA está temporalmente desactivada para usuarios gratuitos. Hazte BASIC o PRO para continuar.' }));
+            } else if (error?.message?.includes('ritmo máximo')) {
+                setErrorMsg('Límite de generación alcanzado. Espera 1-2 minutos y vuelve a intentarlo.');
+            } else {
+                setErrorMsg(error.message || t('upload.ai.error'));
+            }
             setStatus('error');
         } finally {
             setIsGenerating(false);
@@ -319,26 +349,22 @@ export default function UploadPage() {
         setErrorMsg('');
 
         try {
-            if (!currentUser || currentUser.uid === 'guest') {
-                setErrorMsg(t('auth.loginRequired', { defaultValue: 'Please log in to save questions.' }));
-                setStatus('error');
-                return;
-            }
+            const uid = currentUser?.uid || 'guest';
 
             // Create new subject if it doesn't exist
             if (subject && !availableSubjects.includes(subject)) {
-                await addSubject(subject, currentUser.uid);
+                await addSubject(subject, uid);
             }
 
             // Create new topic if it doesn't exist
             if (topic) {
                 const topicExists = availableTopics.some(t => t.name === topic && t.subject === subject);
                 if (!topicExists) {
-                    await addTopic(topic, currentUser.uid, subject || undefined);
+                    await addTopic(topic, uid, subject || undefined);
                 }
             }
 
-            await saveQuestions(preview, currentUser.uid);
+            await saveQuestions(preview, uid);
             setStatus('success');
             setPreview([]);
             setText('');
@@ -347,7 +373,7 @@ export default function UploadPage() {
             setTopic('');
             setSubject('');
             // Refresh available topics
-            const data = await getTopicsData(currentUser.uid);
+            const data = await getTopicsData(uid);
             setAvailableTopics(data);
             const subjects = Array.from(new Set(data.map(t => t.subject || 'Uncategorized'))).filter(s => s !== 'Uncategorized');
             setAvailableSubjects(subjects as string[]);
@@ -485,7 +511,7 @@ export default function UploadPage() {
                                     options: partial.options || [],
                                     answer: partial.answer || '',
                                     topic: topic || 'General',
-                                    subject: subject || undefined,
+            subject: subject || 'Sin categoría',
                                     difficulty: difficulty, // Use current page state
                                     disabled: false,
                                     createdAt: Date.now(),
@@ -528,27 +554,64 @@ export default function UploadPage() {
                     <div className="space-y-6 animate-fadeIn">
 
                         <div>
-                            {/* Credits Display */}
-                            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 mb-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                                        <span className="font-semibold text-indigo-900 dark:text-indigo-200">
-                                            {t('AI Credits', { defaultValue: 'AI Credits' })}
-                                        </span>
+                            {/* ⚠️ BANNER DE BLOQUEO */}
+                            {isAiBlocked(userProfile?.tier, userProfile?.personalizedAds) ? (
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-5 mb-6">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg flex-shrink-0">
+                                            <Crown className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm mb-1">
+                                                {userProfile?.personalizedAds === false
+                                                    ? 'IA no disponible con cookies limitadas'
+                                                    : t('upload.ai.locked.title', { defaultValue: 'Función temporalmente limitada' })}
+                                            </h4>
+                                            <p className="text-sm text-amber-800 dark:text-amber-300/90 mb-3">
+                                                {userProfile?.personalizedAds === false
+                                                    ? 'Has elegido "Solo cookies necesarias". La generación con IA requiere aceptar publicidad personalizada para poder ser sostenible. Puedes cambiar tu preferencia en Configuración.'
+                                                    : t('upload.ai.locked.description', { defaultValue: 'La generación con IA está disponible solo para los planes BASIC y PRO. Estamos trabajando para reintegrar la versión gratuita con publicidad.' })}
+                                            </p>
+                                            {userProfile?.personalizedAds === false ? (
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('¿Quieres aceptar publicidad personalizada para desbloquear la IA?')) {
+                                                            window.location.reload();
+                                                        }
+                                                    }}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 px-4 py-2 rounded-lg transition-colors"
+                                                >
+                                                    Cambiar preferencia de cookies
+                                                </button>
+                                            ) : (
+                                                <a
+                                                    href="/"
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 px-4 py-2 rounded-lg transition-colors"
+                                                >
+                                                    {t('upload.ai.locked.cta', { defaultValue: 'Ver planes de pago' })}
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
-                                    <span className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-                                        {userProfile?.tier === 'pro' ? '∞' : (userProfile?.credits ?? 0)}
-                                    </span>
                                 </div>
-                                <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mt-1 pl-7">
-                                    {userProfile?.tier === 'free'
-                                        ? "Resets daily. Upgrade for more."
-                                        : userProfile?.tier === 'pro'
-                                            ? "Unlimited Access"
-                                            : "Monthly credits"}
-                                </p>
-                            </div>
+                            ) : (
+                                /* Credits Progress Bar (solo para tiers con acceso: basic, pro) */
+                                <div className="mb-6">
+                                    {userProfile?.tier === 'basic' ? (
+                                        <CreditProgressBar
+                                            current={userProfile?.credits ?? 0}
+                                            max={AI_BASIC_MONTHLY_LIMIT}
+                                            label={t('upload.ai.creditsLabel', { defaultValue: 'Generaciones IA' })}
+                                        />
+                                    ) : userProfile?.tier === 'pro' ? (
+                                        <CreditProgressBar
+                                            current={userProfile?.usage?.dayWindowCount ?? 0}
+                                            max={50}
+                                            label={t('upload.ai.dailyGenerations', { defaultValue: 'Generaciones hoy' })}
+                                        />
+                                    ) : null}
+                                </div>
+                            )}
 
                             {/* Mode Toggle Selector */}
                             <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl mb-6">
@@ -740,7 +803,7 @@ export default function UploadPage() {
                         <div className="flex justify-end pt-4">
                             <button
                                 onClick={handleGenerate}
-                                disabled={isGenerating || isExtractingPdf || (!aiText.trim()) || (aiMode === 'generate' && aiTypes.length === 0)}
+                                disabled={isAiBlocked(userProfile?.tier, userProfile?.personalizedAds) || isGenerating || isExtractingPdf || (!aiText.trim()) || (aiMode === 'generate' && aiTypes.length === 0)}
                                 className="btn-primary flex items-center py-2.5 px-6 rounded-xl disabled:opacity-50"
                             >
                                 {isGenerating ? (
@@ -766,13 +829,28 @@ export default function UploadPage() {
             {/* Status Messages */}
             {status === 'success' && (
                 <div className="mt-6 rounded-xl bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800 animate-fadeIn">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0 bg-green-100 dark:bg-green-900/50 p-2 rounded-full">
-                            <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0 bg-green-100 dark:bg-green-900/50 p-2 rounded-full">
+                                <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                                    {t('upload.success', { defaultValue: 'Preguntas guardadas con éxito.' })}
+                                </p>
+                                {(!currentUser || currentUser.uid === 'guest') && (
+                                    <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
+                                        Guardado temporalmente en este dispositivo.
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                        <div className="ml-3">
-                            <p className="text-sm font-medium text-green-800 dark:text-green-300">{t('upload.success')}</p>
-                        </div>
+                        <button
+                            onClick={() => navigate('/setup')}
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                            Practicar ahora
+                        </button>
                     </div>
                 </div>
             )}

@@ -5,11 +5,14 @@ import { BookOpen, Trophy, TrendingUp, Play, User, Plus, Edit2, Check, X, AlertC
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProgress, type TopicStats } from '../services/progressService';
 import { getTopicsData, getQuestions, addTopic, renameTopic as renameTopicService, migrateLegacyData } from '../services/questionService';
+import { shareTopic } from '../services/shareService';
 import type { Question } from '../types';
 import { RewardedVideo } from '../components/RewardedVideo';
 import { addFreeCredits } from '../services/userService';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../services/firebase';
+import { savePendingCheckout } from '../utils/checkoutRedirect';
+import { allowLocalAction } from '../utils/antiAbuse';
 
 export default function DashboardPage() {
     const { t } = useTranslation();
@@ -24,14 +27,39 @@ export default function DashboardPage() {
     const [error, setError] = useState<string | null>(null);
 
     const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+    const [selectedTier, setSelectedTier] = useState<'basic' | 'pro'>('basic');
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
     const [checkoutStep, setCheckoutStep] = useState<'selection' | 'processing' | 'success'>('selection');
+    const [acknowledgeImmediateAccess, setAcknowledgeImmediateAccess] = useState(false);
 
     const handleSubscribe = async () => {
+        const localGuard = allowLocalAction('checkout', 2500, 4, 15 * 60 * 1000);
+        if (!localGuard.ok) {
+            alert('Demasiados intentos seguidos. Espera un poco antes de volver a contratar.');
+            return;
+        }
+
+        if (!acknowledgeImmediateAccess) {
+            alert('Debes aceptar la ejecución inmediata del servicio y la pérdida del desistimiento sobre lo ya consumido.');
+            return;
+        }
+
+        // Si no hay sesión, guardar selección y redirigir al login
+        if (!currentUser) {
+            savePendingCheckout(selectedTier, billingCycle);
+            window.location.href = '/login';
+            return;
+        }
+
         setCheckoutStep('processing');
         try {
-            const createCheckout = httpsCallable<{ plan: 'monthly' | 'yearly' }, { url: string }>(functions, 'createStripeCheckout');
-            const result = await createCheckout({ plan: billingCycle });
+            const createCheckout = httpsCallable<{ tier: 'basic' | 'pro'; billing: 'monthly' | 'yearly'; acknowledgeImmediateAccess: boolean; origin?: string }, { url: string }>(functions, 'createStripeCheckout');
+            const result = await createCheckout({
+                tier: selectedTier,
+                billing: billingCycle,
+                acknowledgeImmediateAccess,
+                origin: window.location.origin,
+            });
             const checkoutUrl = result.data.url;
             
             if (checkoutUrl) {
@@ -62,6 +90,20 @@ export default function DashboardPage() {
         } catch (e) {
             console.error(e);
             alert("Failed to add credit");
+        }
+    };
+
+    const handleManageSubscription = async () => {
+        if (!currentUser) return;
+        try {
+            const createPortal = httpsCallable<{ origin?: string }, { url: string }>(functions, 'createCustomerPortalSession');
+            const result = await createPortal({ origin: window.location.origin });
+            if (result.data.url) {
+                window.location.assign(result.data.url);
+            }
+        } catch (err: any) {
+            console.error("Failed to open portal:", err);
+            alert(err.message || "Error al abrir el portal de gestión.");
         }
     };
 
@@ -100,6 +142,13 @@ export default function DashboardPage() {
         } else if (query.get('checkout') === 'cancel') {
             setIsPricingModalOpen(true);
             setCheckoutStep('selection');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (query.get('showPricing') === 'true') {
+            setIsPricingModalOpen(true);
+            const t = query.get('tier');
+            if (t === 'basic' || t === 'pro') setSelectedTier(t);
+            const b = query.get('billing');
+            if (b === 'monthly' || b === 'yearly') setBillingCycle(b);
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }, []);
@@ -285,6 +334,59 @@ export default function DashboardPage() {
         loadData();
     };
 
+    const handleShareTopic = async (topicName: string, subjectName: string | undefined) => {
+        if (!currentUser || currentUser.uid === 'guest') {
+            alert('Debes iniciar sesión para compartir temas.');
+            return;
+        }
+
+        const topicQuestions = allQuestions.filter(q => q.topic === topicName && (q.subject === subjectName || (!q.subject && !subjectName) || (!subjectName && q.subject === 'Uncategorized')));
+        if (topicQuestions.length === 0) {
+            alert('No hay preguntas en este tema para compartir.');
+            return;
+        }
+
+        // Generamos el ID y la URL de forma síncrona para no perder el gesto del usuario y permitir el copiado en Safari/iOS
+        const shareId = crypto.randomUUID().slice(0, 8);
+        const shareUrl = `${window.location.origin}/share-topic/${shareId}`;
+        
+        let copiedSuccessfully = false;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                // Hacemos el await de clipboard.writeText aquí, antes del await de Firebase
+                await navigator.clipboard.writeText(shareUrl);
+                copiedSuccessfully = true;
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = shareUrl;
+                textArea.style.position = "absolute";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+                copiedSuccessfully = true;
+            }
+        } catch (clipboardErr) {
+            console.warn('Clipboard write failed:', clipboardErr);
+        }
+
+        try {
+            // Ahora sí, guardamos en base de datos
+            await shareTopic(topicName, subjectName, topicQuestions, currentUser.uid, currentUser.displayName || undefined, shareId);
+            
+            if (copiedSuccessfully) {
+                alert('¡Enlace de invitación copiado al portapapeles! Envíalo a tus amigos.');
+            } else {
+                prompt('El enlace se ha generado, pero tu navegador bloqueó el portapapeles. Cópialo manualmente:', shareUrl);
+            }
+        } catch (err: any) {
+            console.error('Error sharing topic:', err);
+            alert(`Error al guardar el tema compartido: ${err.message || err}`);
+        }
+    };
+
     const handleEditProfile = () => {
         setNewName(currentUser?.displayName || '');
         setNewUsername(userProfile?.username || '');
@@ -390,6 +492,14 @@ export default function DashboardPage() {
                                     <Crown className="w-3 h-3 fill-current text-slate-950" />
                                     <span>PRO</span>
                                 </span>
+                            )}
+                            {userProfile?.subscription?.status === 'active' && userProfile?.subscription?.provider === 'stripe' && (
+                                <button
+                                    onClick={handleManageSubscription}
+                                    className="text-xs text-indigo-500 hover:text-indigo-400 underline ml-2"
+                                >
+                                    {t('dashboard.manageSubscription', { defaultValue: 'Gestionar suscripción' })}
+                                </button>
                             )}
                             {/* Settings icon could go here */}
                             <button className="sm:hidden text-slate-900 dark:text-white">
@@ -611,34 +721,13 @@ export default function DashboardPage() {
 
                 {/* Main Content Area */}
                 <div className="mt-2">
-                    {/* Guest View: Call to Action & Tips */}
+                    {/* Guest redirect to homepage */}
                     {!currentUser ? (
-                        <div className="space-y-8 animate-fade-in">
-                            {/* CTA Card */}
-                            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-slate-800 dark:to-slate-800/50 rounded-2xl p-8 text-center border border-indigo-100 dark:border-slate-700 shadow-sm">
-                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
-                                    ¡Lleva tu aprendizaje al siguiente nivel!
-                                </h3>
-                                <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8 text-lg">
-                                    No pierdas tu progreso. Crea una cuenta gratuita para guardar tus estadísticas,
-                                    identificar tus puntos débiles y acceder desde cualquier dispositivo.
-                                    ¡Únete ahora y empieza a mejorar tus resultados hoy mismo!
-                                </p>
-                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                    <button
-                                        onClick={() => navigate('/login')}
-                                        className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
-                                    >
-                                        Entrar
-                                    </button>
-                                    <button
-                                        onClick={() => navigate('/config')}
-                                        className="px-8 py-3 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-900 dark:text-white font-bold rounded-xl border border-slate-200 dark:border-slate-600 transition-colors shadow-sm"
-                                    >
-                                        Comenzar Nuevo Test
-                                    </button>
-                                </div>
-                            </div>
+                        <div className="text-center py-20">
+                            <p className="text-slate-500 dark:text-slate-400 mb-4">Inicia sesión para ver tu dashboard.</p>
+                            <button onClick={() => navigate('/login')} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors">
+                                Iniciar sesión
+                            </button>
                         </div>
                     ) : (
                         /* Logged In User View: Topics Grid */
@@ -752,6 +841,16 @@ export default function DashboardPage() {
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
+                                                                                    handleShareTopic(topic.topic, topic.subject);
+                                                                                }}
+                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-full transition-all"
+                                                                                title={t('common.share', { defaultValue: 'Compartir' })}
+                                                                            >
+                                                                                <Share className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
                                                                                     setEditingTopicId(topic.topic);
                                                                                     setTempTopicName(topic.topic);
                                                                                 }}
@@ -770,7 +869,7 @@ export default function DashboardPage() {
                                                                                 <span className="text-[10px] uppercase text-slate-400 font-bold">Details</span>
                                                                                 <div className="flex space-x-3">
                                                                                     <Edit2 onClick={() => { setEditingTopicId(topic.topic); setTempTopicName(topic.topic); }} className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
-                                                                                    <Share className="w-3 h-3 text-slate-400 hover:text-purple-400 cursor-pointer" />
+                                                                                    <Share onClick={() => handleShareTopic(topic.topic, topic.subject)} className="w-3 h-3 text-slate-400 hover:text-indigo-400 cursor-pointer" />
                                                                                 </div>
                                                                             </div>
                                                                             <div className="grid grid-cols-3 gap-1">
@@ -908,8 +1007,8 @@ export default function DashboardPage() {
 
             {/* Pricing / Premium Subscription Modal */}
             {isPricingModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto">
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative my-auto">
                         {/* Glow spots */}
                         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
                         <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -925,52 +1024,119 @@ export default function DashboardPage() {
                         )}
 
                         {checkoutStep === 'selection' && (
-                            <div className="p-6 sm:p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-6 overflow-y-auto">
                                 <div className="text-center space-y-2">
                                     <div className="inline-flex p-3 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 text-yellow-500 rounded-2xl mb-2 border border-yellow-500/30">
                                         <Crown className="w-8 h-8 text-yellow-500 animate-pulse" />
                                     </div>
-                                    <h2 className="text-2xl font-bold text-white">Hazte FlashTests PRO</h2>
+                                    <h2 className="text-2xl font-bold text-white">{t('plans.title', { defaultValue: 'Elige tu plan' })}</h2>
                                     <p className="text-slate-400 text-sm">
-                                        Prepara tus exámenes u oposiciones sin límites de preguntas, sin publicidad y con ayuda de Inteligencia Artificial.
+                                        {t('plans.subtitle', { defaultValue: 'Prepara tus exámenes con ayuda de Inteligencia Artificial.' })}
                                     </p>
                                 </div>
 
-                                {/* Features List */}
-                                <div className="space-y-3 bg-slate-950/40 border border-white/5 rounded-2xl p-4 sm:p-5">
-                                    <div className="flex items-start space-x-3 text-sm">
-                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
-                                            <Check className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="text-slate-200">
-                                            <strong className="text-white font-semibold">Generación Ilimitada:</strong> Crea tantos temas y tests como necesites sin restricción de créditos.
+                                <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-slate-200 space-y-3">
+                                    <p>
+                                        El servicio digital se activa de forma inmediata al contratar. Al continuar, solicitas expresamente la ejecución inmediata del servicio y reconoces que el desistimiento puede quedar limitado respecto de lo ya consumido.
+                                    </p>
+                                    <label className="flex items-start gap-3 cursor-pointer text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={acknowledgeImmediateAccess}
+                                            onChange={(e) => setAcknowledgeImmediateAccess(e.target.checked)}
+                                            className="mt-1 h-4 w-4 rounded border-slate-500 text-amber-500 focus:ring-amber-500"
+                                        />
+                                        <span>
+                                            Acepto la ejecución inmediata del servicio digital y entiendo que, una vez consumido el acceso o las generaciones, el derecho de desistimiento puede decaer en la medida permitida por la ley.
                                         </span>
-                                    </div>
-                                    <div className="flex items-start space-x-3 text-sm">
-                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
-                                            <Check className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="text-slate-200">
-                                            <strong className="text-white font-semibold">Explicaciones con IA:</strong> Entiende por qué fallas con análisis paso a paso en cada pregunta.
-                                        </span>
-                                    </div>
-                                    <div className="flex items-start space-x-3 text-sm">
-                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
-                                            <Check className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="text-slate-200">
-                                            <strong className="text-white font-semibold">Sin Anuncios:</strong> Estudia concentrado con una interfaz limpia y libre de banners.
-                                        </span>
-                                    </div>
-                                    <div className="flex items-start space-x-3 text-sm">
-                                        <div className="mt-0.5 p-0.5 bg-yellow-500/20 text-yellow-400 rounded-full flex-shrink-0">
-                                            <Check className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="text-slate-200">
-                                            <strong className="text-white font-semibold">Estadísticas completas:</strong> Historial completo de notas y dominio de asignaturas.
-                                        </span>
-                                    </div>
+                                    </label>
                                 </div>
+
+                                {/* Tier Selector: BASIC / PRO */}
+                                <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
+                                    <button
+                                        onClick={() => setSelectedTier('basic')}
+                                        className={`py-2 text-sm font-semibold rounded-lg transition-all ${selectedTier === 'basic' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        {t('plans.basic.label', { defaultValue: 'Básico' })}
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedTier('pro')}
+                                        className={`py-2 text-sm font-semibold rounded-lg transition-all ${selectedTier === 'pro' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        {t('plans.pro.label', { defaultValue: 'PRO' })}
+                                    </button>
+                                </div>
+
+                                {/* Plan Details */}
+                                {selectedTier === 'basic' ? (
+                                    <div className="space-y-4 bg-slate-950/40 border border-white/5 rounded-2xl p-4 sm:p-5">
+                                        <div className="text-center">
+                                            <span className="text-3xl font-bold text-white">
+                                                {billingCycle === 'monthly' ? '4,99 €' : '49,90 €'}
+                                            </span>
+                                            <span className="text-slate-400 text-sm">
+                                                {billingCycle === 'monthly' ? ' / mes' : ' / año'}
+                                            </span>
+                                            {billingCycle === 'yearly' && (
+                                                <p className="text-xs text-emerald-400 mt-1">{t('plans.basic.yearlySave', { defaultValue: 'Ahorras 2 meses (equivalente a 4,16 €/mes)' })}</p>
+                                            )}
+                                        </div>
+                                        <ul className="space-y-2 text-sm">
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                                <span><strong className="text-white">{t('plans.basic.feature1', { defaultValue: '30 generaciones con IA al mes' })}</strong> {t('plans.basic.feature1Desc', { defaultValue: 'Los no usados se acumulan (rollover).' })}</span>
+                                            </li>
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                                <span><strong className="text-white">{t('plans.basic.feature2', { defaultValue: 'Sin publicidad' })}</strong></span>
+                                            </li>
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                                <span>{t('plans.basic.feature3', { defaultValue: 'Estadísticas completas de progreso' })}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4 bg-gradient-to-br from-indigo-950/40 to-slate-950/40 border border-yellow-500/20 rounded-2xl p-4 sm:p-5">
+                                        <div className="text-center">
+                                            <span className="inline-block bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-bold mb-2">{t('plans.pro.badge', { defaultValue: 'MÁS POPULAR' })}</span>
+                                            <div>
+                                                <span className="text-3xl font-bold text-white">
+                                                    {billingCycle === 'monthly' ? '9,98 €' : '99,80 €'}
+                                                </span>
+                                                <span className="text-slate-400 text-sm">
+                                                    {billingCycle === 'monthly' ? ' / mes' : ' / año'}
+                                                </span>
+                                            </div>
+                                            {billingCycle === 'yearly' && (
+                                                <p className="text-xs text-emerald-400 mt-1">{t('plans.pro.yearlySave', { defaultValue: 'Ahorras 2 meses (equivalente a 8,32 €/mes)' })}</p>
+                                            )}
+                                        </div>
+                                        <ul className="space-y-2 text-sm">
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                                <span><strong className="text-white">{t('plans.pro.feature1', { defaultValue: '50 generaciones con IA al día' })}</strong> {t('plans.pro.feature1Desc', { defaultValue: 'Suficiente para uso intensivo diario.' })}</span>
+                                            </li>
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                                <span><strong className="text-white">{t('plans.pro.feature2', { defaultValue: 'Subida de PDFs' })}</strong> {t('plans.pro.feature2Desc', { defaultValue: 'Extrae preguntas directamente.' })}</span>
+                                            </li>
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                                <span><strong className="text-white">{t('plans.pro.feature3', { defaultValue: 'Máximo contexto' })}</strong> {t('plans.pro.feature3Desc', { defaultValue: 'Hasta 100 000 caracteres por generación.' })}</span>
+                                            </li>
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                                <span><strong className="text-white">{t('plans.pro.feature4', { defaultValue: 'Sin publicidad' })}</strong></span>
+                                            </li>
+                                            <li className="flex items-start gap-2 text-slate-300">
+                                                <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                                <span>{t('plans.pro.feature5', { defaultValue: 'Estadísticas completas de progreso' })}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                )}
 
                                 {/* Billing Selector */}
                                 <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
@@ -978,46 +1144,31 @@ export default function DashboardPage() {
                                         onClick={() => setBillingCycle('monthly')}
                                         className={`py-2 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'monthly' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        Mensual
+                                        {t('plans.billing.monthly', { defaultValue: 'Mensual' })}
                                     </button>
                                     <button
                                         onClick={() => setBillingCycle('yearly')}
                                         className={`py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center space-x-2 ${billingCycle === 'yearly' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        <span>Anual</span>
+                                        <span>{t('plans.billing.yearly', { defaultValue: 'Anual' })}</span>
                                         <span className="bg-yellow-400/20 text-yellow-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                                            -50%
+                                            -17%
                                         </span>
                                     </button>
-                                </div>
-
-                                {/* Plan pricing details */}
-                                <div className="text-center p-2">
-                                    {billingCycle === 'monthly' ? (
-                                        <div>
-                                            <span className="text-3xl font-bold text-white">4,99 €</span>
-                                            <span className="text-slate-400 text-sm"> / mes</span>
-                                            <p className="text-xs text-slate-500 mt-1">Cancela cuando quieras. Sin permanencia.</p>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <span className="text-3xl font-bold text-white">29,99 €</span>
-                                            <span className="text-slate-400 text-sm"> / año</span>
-                                            <p className="text-xs text-slate-500 mt-1">Equivalente a 2,49 € al mes. Facturado anualmente.</p>
-                                        </div>
-                                    )}
                                 </div>
 
                                 {/* CTA Button */}
                                 <div className="space-y-3">
                                     <button
                                         onClick={handleSubscribe}
-                                        className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-bold rounded-2xl shadow-lg hover:shadow-yellow-500/10 active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                                        disabled={!acknowledgeImmediateAccess}
+                                        className={`w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-bold rounded-2xl shadow-lg hover:shadow-yellow-500/10 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 ${!acknowledgeImmediateAccess ? 'opacity-50 cursor-not-allowed hover:from-amber-500 hover:to-yellow-400' : ''}`}
                                     >
-                                        <span>Comenzar Suscripción</span>
+                                        <Crown className="w-5 h-5" />
+                                        <span>{selectedTier === 'basic' ? t('plans.cta.basic', { defaultValue: 'Suscribirse al plan Básico' }) : t('plans.cta.pro', { defaultValue: 'Suscribirse al plan PRO' })}</span>
                                     </button>
                                     <div className="flex items-center justify-center space-x-1 text-slate-500 text-xs">
-                                        <span>🔒 Pago seguro SSL por Stripe</span>
+                                        <span>🔒 {t('plans.securePayment', { defaultValue: 'Pago seguro SSL por Stripe' })}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1062,5 +1213,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-
-

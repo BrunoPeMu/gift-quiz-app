@@ -1,11 +1,17 @@
 import React from 'react';
 import { Navbar } from './Navbar';
+import Footer from './Footer';
+import { AdBanner } from './AdBanner';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
     children: React.ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
+    const { userProfile } = useAuth();
+    const showAds = userProfile?.tier === 'free' || userProfile?.tier === 'guest';
+
     return (
         <div className="min-h-screen flex flex-col relative overflow-hidden text-slate-100">
             {/* Ambient Glow (Aurora Effects) */}
@@ -17,9 +23,11 @@ export function Layout({ children }: LayoutProps) {
 
             <div className="relative z-10 flex flex-col flex-grow w-full">
                 <Navbar />
+                {showAds && <AdBanner />}
                 <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
                     {children}
                 </main>
+                <Footer />
             </div>
         </div>
     );

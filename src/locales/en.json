@@ -75,6 +75,7 @@
         "guestMessage": "Don't lose your progress. Create a free account to save your stats, identify weak spots, and access your data from any device. Join now and start improving your results today!",
         "editProfile": "Edit Profile",
         "saveProfile": "Save Profile",
+        "manageSubscription": "Manage subscription",
         "nickName": "Nickname (Display Name)",
         "handle": "Public Handle (@username)",
         "internalId": "Internal ID (Database UID)",
@@ -170,8 +171,51 @@
             "errors": {
                 "apiKey": "API Key not found. Please add VITE_GEMINI_API_KEY to your .env file.",
                 "sourceText": "Source text is required"
-            }
+            },
+            "locked": {
+                "title": "Temporarily restricted",
+                "description": "AI generation is currently only available for BASIC and PRO plans. We are working to reintegrate the free tier with ads.",
+                "cta": "View pricing plans",
+                "error": "AI generation is temporarily disabled for free users. Upgrade to BASIC or PRO to continue."
+            },
+            "basicCreditsRemaining": "{{count}} generations remaining this month (resets monthly)",
+            "proCreditsInfo": "Up to 50 generations per day. Virtually unlimited.",
+            "monthlyCredits": "Monthly credits"
         }
+    },
+    "plans": {
+        "title": "Choose your plan",
+        "subtitle": "Prepare for your exams with AI assistance.",
+        "basic": {
+            "label": "Basic",
+            "yearlySave": "Save 2 months (equivalent to €4.16/month)",
+            "feature1": "30 AI generations per month",
+            "feature1Desc": "Unused credits roll over.",
+            "feature2": "Ad-free experience",
+            "feature3": "Full progress statistics"
+        },
+        "pro": {
+            "label": "PRO",
+            "badge": "MOST POPULAR",
+            "yearlySave": "Save 2 months (equivalent to €8.32/month)",
+            "feature1": "50 AI generations per day",
+            "feature1Desc": "Enough for intensive daily use.",
+            "feature2": "PDF upload",
+            "feature2Desc": "Extract questions directly.",
+            "feature3": "Maximum context",
+            "feature3Desc": "Up to 100,000 characters per generation.",
+            "feature4": "Ad-free experience",
+            "feature5": "Full progress statistics"
+        },
+        "billing": {
+            "monthly": "Monthly",
+            "yearly": "Yearly"
+        },
+        "cta": {
+            "basic": "Subscribe to Basic",
+            "pro": "Subscribe to PRO"
+        },
+        "securePayment": "SSL secure payment by Stripe"
     },
     "manage": {
         "title": "Manage Questions",

@@ -47,5 +47,19 @@ service cloud.firestore {
        allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
+
+    // Shared Quizzes: Public read, authenticated create
+    match /shared_quizzes/{shareId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
+
+    // Shared Topics: Public read, authenticated create
+    match /shared_topics/{shareId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
   }
 }

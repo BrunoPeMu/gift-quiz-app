@@ -4,6 +4,8 @@ import { BookOpen, Upload, Layers, LogIn, User, Layout, Menu, X, Shield, Sun, Mo
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import { CreditProgressBar } from './CreditProgressBar';
+import { AI_BASIC_MONTHLY_LIMIT } from '../config/featureFlags';
 
 export function Navbar() {
     const location = useLocation();
@@ -12,12 +14,16 @@ export function Navbar() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-    const navItems = [
-        { path: '/', label: t('nav.home', { defaultValue: 'Inicio' }), icon: Layout },
-        { path: '/setup', label: t('nav.takeQuiz', { defaultValue: 'Test' }), icon: BookOpen },
-        { path: '/upload', label: t('nav.upload', { defaultValue: 'Crear' }), icon: Upload },
-        { path: '/manage', label: t('nav.manage', { defaultValue: 'Contenido' }), icon: Layers },
-    ];
+    const navItems = currentUser
+        ? [
+            { path: '/dashboard', label: t('nav.home', { defaultValue: 'Dashboard' }), icon: Layout },
+            { path: '/setup', label: t('nav.takeQuiz', { defaultValue: 'Test' }), icon: BookOpen },
+            { path: '/upload', label: t('nav.upload', { defaultValue: 'Crear' }), icon: Upload },
+            { path: '/manage', label: t('nav.manage', { defaultValue: 'Contenido' }), icon: Layers },
+        ]
+        : [
+            { path: '/', label: t('nav.home', { defaultValue: 'Inicio' }), icon: Layout },
+        ];
 
     if (userProfile?.isAdmin) {
         navItems.push({ path: '/admin', label: 'Admin', icon: Shield });
@@ -65,10 +71,21 @@ export function Navbar() {
                         {currentUser ? (
                             <div className="relative flex items-center gap-4">
                                 {/* Credits Display (Desktop) */}
-                                <div className="hidden lg:flex items-center bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-800 text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                                    <Sparkles className="w-4 h-4 mr-1.5 text-indigo-500" />
-                                    <span>{userProfile?.tier === 'pro' ? '∞' : (userProfile?.credits ?? 0)}</span>
-                                </div>
+                                {userProfile?.tier === 'basic' ? (
+                                    <div className="hidden lg:flex items-center gap-2 min-w-[140px]">
+                                        <Sparkles className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                                        <CreditProgressBar
+                                            current={userProfile?.credits ?? 0}
+                                            max={AI_BASIC_MONTHLY_LIMIT}
+                                            variant="compact"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="hidden lg:flex items-center bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-800 text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                                        <Sparkles className="w-4 h-4 mr-1.5 text-indigo-500" />
+                                        <span>{userProfile?.tier === 'pro' ? '∞' : (userProfile?.credits ?? 0)}</span>
+                                    </div>
+                                )}
 
                                 <button
                                     onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
@@ -220,15 +237,25 @@ export function Navbar() {
                         {currentUser ? (
                             <div className="px-4 space-y-4">
                                 {/* Credits Display (Mobile) */}
-                                <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 px-4 py-3 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                                    <div className="flex items-center text-indigo-700 dark:text-indigo-300 font-medium">
-                                        <Sparkles className="w-5 h-5 mr-3 text-indigo-500" />
-                                        <span>{t('Credits', { defaultValue: 'Créditos' })}</span>
+                                {userProfile?.tier === 'basic' ? (
+                                    <div className="px-1 py-2">
+                                        <CreditProgressBar
+                                            current={userProfile?.credits ?? 0}
+                                            max={AI_BASIC_MONTHLY_LIMIT}
+                                            label={t('Credits', { defaultValue: 'Créditos' })}
+                                        />
                                     </div>
-                                    <span className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
-                                        {userProfile?.tier === 'pro' ? '∞' : (userProfile?.credits ?? 0)}
-                                    </span>
-                                </div>
+                                ) : (
+                                    <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 px-4 py-3 rounded-xl border border-indigo-100 dark:border-indigo-800">
+                                        <div className="flex items-center text-indigo-700 dark:text-indigo-300 font-medium">
+                                            <Sparkles className="w-5 h-5 mr-3 text-indigo-500" />
+                                            <span>{t('Credits', { defaultValue: 'Créditos' })}</span>
+                                        </div>
+                                        <span className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
+                                            {userProfile?.tier === 'pro' ? '∞' : (userProfile?.credits ?? 0)}
+                                        </span>
+                                    </div>
+                                )}
 
                                 <Link
                                     to="/profile"

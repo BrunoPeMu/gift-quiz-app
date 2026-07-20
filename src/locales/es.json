@@ -95,6 +95,7 @@
             "light": "Claro",
             "dark": "Oscuro"
         },
+        "manageSubscription": "Gestionar suscripción",
         "upgradeToPremium": "Mejorar a Premium (Simulado)",
         "cancel": "Cancelar",
         "subtitle": "¿Listo para dominar tus asignaturas? Sigue tu progreso y mejora cada día.",
@@ -198,7 +199,16 @@
             "errors": {
                 "apiKey": "No se encontró la API Key. Por favor añade VITE_GEMINI_API_KEY a tu archivo .env.",
                 "sourceText": "El texto fuente es obligatorio"
-            }
+            },
+            "locked": {
+                "title": "Función temporalmente limitada",
+                "description": "La generación con IA está disponible solo para los planes BASIC y PRO. Estamos trabajando para reintegrar la versión gratuita con publicidad.",
+                "cta": "Ver planes de pago",
+                "error": "La generación con IA está temporalmente desactivada para usuarios gratuitos. Hazte BASIC o PRO para continuar."
+            },
+            "basicCreditsRemaining": "Te quedan {{count}} generaciones este mes (se reinician cada mes)",
+            "proCreditsInfo": "Hasta 50 generaciones al día. Ilimitado prácticamente.",
+            "monthlyCredits": "Créditos mensuales"
         }
     },
     "manage": {
@@ -225,5 +235,39 @@
     "ad": {
         "title": "Publicidad",
         "cta": "Mejora a Premium para eliminar anuncios"
+    },
+    "plans": {
+        "title": "Elige tu plan",
+        "subtitle": "Prepara tus exámenes con ayuda de Inteligencia Artificial.",
+        "basic": {
+            "label": "Básico",
+            "yearlySave": "Ahorras 2 meses (equivalente a 4,16 €/mes)",
+            "feature1": "30 generaciones con IA al mes",
+            "feature1Desc": "Los no usados se acumulan (rollover).",
+            "feature2": "Sin publicidad",
+            "feature3": "Estadísticas completas de progreso"
+        },
+        "pro": {
+            "label": "PRO",
+            "badge": "MÁS POPULAR",
+            "yearlySave": "Ahorras 2 meses (equivalente a 8,32 €/mes)",
+            "feature1": "50 generaciones con IA al día",
+            "feature1Desc": "Suficiente para uso intensivo diario.",
+            "feature2": "Subida de PDFs",
+            "feature2Desc": "Extrae preguntas directamente.",
+            "feature3": "Máximo contexto",
+            "feature3Desc": "Hasta 100 000 caracteres por generación.",
+            "feature4": "Sin publicidad",
+            "feature5": "Estadísticas completas de progreso"
+        },
+        "billing": {
+            "monthly": "Mensual",
+            "yearly": "Anual"
+        },
+        "cta": {
+            "basic": "Suscribirse al plan Básico",
+            "pro": "Suscribirse al plan PRO"
+        },
+        "securePayment": "Pago seguro SSL por Stripe"
     }
 }

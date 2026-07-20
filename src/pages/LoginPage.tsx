@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Mail, Lock, User, AlertCircle, Loader } from 'lucide-react';
+import { consumePendingCheckout, buildCheckoutUrl } from '../utils/checkoutRedirect';
 
 export default function LoginPage() {
     const { t } = useTranslation();
@@ -15,12 +16,21 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [termsChecked, setTermsChecked] = useState(false);
+    const redirectAfterLogin = () => {
+        const pending = consumePendingCheckout();
+        if (pending) {
+            navigate(buildCheckoutUrl(pending.tier, pending.billing));
+        } else {
+            navigate('/');
+        }
+    };
+
     const handleGoogleLogin = async () => {
         try {
             setLoading(true);
             setError(null);
             await loginWithGoogle();
-            navigate('/');
+            redirectAfterLogin();
         } catch (err: any) {
             console.error("Popup login error", err);
             // Fallback to redirect if popup is blocked or closed
@@ -54,7 +64,7 @@ export default function LoginPage() {
             } else {
                 await loginWithEmail(email, password);
             }
-            navigate('/');
+            redirectAfterLogin();
         } catch (err: any) {
             // Map common Firebase errors to user friendly messages
             if (err.code === 'auth/email-already-in-use') {
@@ -106,7 +116,7 @@ export default function LoginPage() {
                                 fill="#34A853"
                             />
                             <path
-                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.26+-.19-.58z"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.26-.19-.58z"
                                 fill="#FBBC05"
                             />
                             <path
@@ -202,7 +212,7 @@ export default function LoginPage() {
                             />
                             <span className="text-sm text-slate-600 dark:text-slate-300">
                                 {t('auth.acceptTerms', { defaultValue: 'He leído y acepto los ' })}
-                                <a href="/terms" target="_blank" className="text-indigo-600 hover:text-indigo-500 underline">
+                                <a href="/legal/terminos" target="_blank" className="text-indigo-600 hover:text-indigo-500 underline">
                                     {t('auth.termsLink', { defaultValue: 'términos de uso' })}
                                 </a>
                             </span>

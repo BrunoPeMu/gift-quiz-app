@@ -14,6 +14,7 @@ import { auth, googleProvider, /* appleProvider, */ db } from '../services/fireb
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { UserProfile } from '../types';
 import CookieConsentModal from '../components/CookieConsentModal';
+import { shouldReaccept } from '../config/legal';
 
 interface AuthContextType {
     currentUser: User | null;
@@ -25,7 +26,6 @@ interface AuthContextType {
     loginWithEmail: (email: string, password: string) => Promise<void>;
     registerWithEmail: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
-    togglePremium: () => void; // For testing purposes
     updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
     refreshProfile: () => Promise<void>;
     checkUsernameAvailability: (username: string) => Promise<boolean>;
@@ -46,11 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Mock premium status persistence for demo
-    const [isPremiumMock, setIsPremiumMock] = useState(() => {
-        return localStorage.getItem('isPremium') === 'true';
-    });
-
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
@@ -70,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                         try {
                             const { checkMonthlyCreditRefill } = await import('../services/userService');
-                            const refillResult = await checkMonthlyCreditRefill(user.uid, { credits, lastCreditReset });
+                            const refillResult = await checkMonthlyCreditRefill(user.uid, { credits, lastCreditReset, tier: data.tier || 'free' });
                             if (refillResult) {
                                 credits = refillResult.credits;
                                 lastCreditReset = refillResult.lastCreditReset;
@@ -95,7 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             credits: credits,
                             lastCreditReset: lastCreditReset,
                             termsAccepted: data.termsAccepted || false,
-                            cookiesAccepted: data.cookiesAccepted || false
+                            termsAcceptedAt: data.termsAcceptedAt,
+                            termsAcceptedVersion: data.termsAcceptedVersion,
+                            cookiesAccepted: data.cookiesAccepted || false,
+                            cookiesAcceptedAt: data.cookiesAcceptedAt,
+                            cookiesAcceptedVersion: data.cookiesAcceptedVersion,
                         });
                     } else {
                         // Create new user profile if it doesn't exist
@@ -112,10 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             preferences: { theme: 'system' },
                             tier: 'free',
                             credits: 3,
-                            lastCreditReset: newlyCreatedTime, // Initialize reset time
+                            lastCreditReset: newlyCreatedTime,
                             termsAccepted: true,
                             termsAcceptedAt: Date.now(),
-                            cookiesAccepted: false
+                            cookiesAccepted: true,
+                            cookiesAcceptedAt: Date.now(),
                         };
                         await setDoc(userDocRef, newProfile);
                         setUserProfile(newProfile);
@@ -137,7 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         credits: 3,
                         termsAccepted: true,
                         termsAcceptedAt: Date.now(),
-                        cookiesAccepted: false
+                        cookiesAccepted: true,
+                        cookiesAcceptedAt: Date.now(),
                     });
                 }
             } else {
@@ -146,16 +147,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUserProfile({
                     uid: 'guest',
                     email: '',
-                    displayName: 'Invitado', // Force 'Invitado' for consistency as per user request
-                    // displayName: guestProfile.displayName || 'Guest User', // OLD logic
+                    displayName: 'Invitado',
                     photoURL: guestProfile.photoURL || undefined,
                     isPremium: false,
                     isAdmin: false,
                     role: 'user',
-                    username: undefined, // Clear username
-                    bio: undefined,     // Clear bio
+                    tier: 'guest',
+                    username: undefined,
+                    bio: undefined,
                     createdAt: Date.now(),
-                    preferences: guestProfile.preferences || { theme: 'system' }
+                    preferences: guestProfile.preferences || { theme: 'system' },
+                    cookiesAccepted: guestProfile.cookiesAccepted ?? false,
+                    cookiesAcceptedAt: guestProfile.cookiesAcceptedAt,
+                    cookiesAcceptedVersion: guestProfile.cookiesAcceptedVersion,
                 });
             }
 
@@ -266,7 +270,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             credits: 3,
                             termsAccepted: true,
                             termsAcceptedAt: Date.now(),
-                            cookiesAccepted: false
+                            cookiesAccepted: true,
+                            cookiesAcceptedAt: Date.now(),
                         };
             const userDocRef = doc(db, 'users', userCredential.user.uid);
             await setDoc(userDocRef, newProfile);
@@ -290,16 +295,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error("Logout failed", error);
             throw error;
-        }
-    };
-
-    const togglePremium = () => {
-        const newStatus = !isPremiumMock;
-        setIsPremiumMock(newStatus);
-        localStorage.setItem('isPremium', String(newStatus));
-
-        if (userProfile) {
-            setUserProfile({ ...userProfile, isPremium: newStatus });
         }
     };
 
@@ -388,7 +383,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithEmail,
         registerWithEmail,
         logout,
-        togglePremium,
         updateUserProfile,
         refreshProfile,
         checkUsernameAvailability
@@ -397,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (
         <AuthContext.Provider value={value}>
             {!loading && children}
-            {!loading && !userProfile?.cookiesAccepted && !(userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro') && <CookieConsentModal />}
+            {!loading && shouldReaccept(!!userProfile?.cookiesAccepted, userProfile?.cookiesAcceptedVersion) && !(userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro') && <CookieConsentModal />}
         </AuthContext.Provider>
     );
 }

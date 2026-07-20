@@ -185,8 +185,8 @@ export default function AdminDashboardPage() {
 
 function UserDetailModal({ user, onClose, onUpdate }: { user: UserProfile, onClose: () => void, onUpdate: (uid: string, data: Partial<UserProfile>) => Promise<void> }) {
     const [formData, setFormData] = useState({
-        role: user.isAdmin ? 'admin' : (user.role || 'user'),
-        plan: user.subscription?.plan || 'free',
+        role: user.isAdmin ? 'admin' as string : (user.role || 'user'),
+        plan: (user.subscription?.plan || 'free') as string,
         status: user.subscription?.status || 'active',
         renewalDate: user.subscription?.renewalDate ? new Date(user.subscription.renewalDate).toISOString().split('T')[0] : '',
         notes: user.adminNotes || ''
@@ -198,8 +198,9 @@ function UserDetailModal({ user, onClose, onUpdate }: { user: UserProfile, onClo
         try {
             const updates: Partial<UserProfile> = {
                 role: formData.role as any,
-                isAdmin: formData.role === 'admin', // Sync legacy field
-                isPremium: formData.plan !== 'free', // Sync legacy field
+                isAdmin: formData.role === 'admin',
+                isPremium: formData.plan !== 'free',
+                tier: formData.plan === 'free' ? 'free' : formData.plan === 'basic' ? 'basic' : 'pro',
                 adminNotes: formData.notes,
                 subscription: {
                     ...user.subscription,
@@ -279,9 +280,10 @@ function UserDetailModal({ user, onClose, onUpdate }: { user: UserProfile, onClo
                                     className="w-full border-slate-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 >
                                     <option value="free">Free</option>
-                                    <option value="monthly">Monthly</option>
-                                    <option value="annual">Annual</option>
-                                    <option value="lifetime">Lifetime</option>
+                                    <option value="basic">Basic (30 gen/mes)</option>
+                                    <option value="monthly">Monthly → PRO</option>
+                                    <option value="annual">Annual → PRO</option>
+                                    <option value="lifetime">Lifetime → PRO</option>
                                 </select>
                             </div>
                             <div>

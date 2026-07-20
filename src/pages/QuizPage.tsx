@@ -106,7 +106,7 @@ export default function QuizPage() {
 
     const finishQuiz = () => {
         setState(s => ({ ...s, isFinished: true }));
-        navigate('/results', { state: { result: state } });
+        navigate('/results', { state: { result: state, config } });
     };
 
     const handleReport = async () => {

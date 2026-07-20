@@ -1,5 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from './firebase';
+import { isAiBlocked } from '../config/featureFlags';
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard';
 
@@ -13,14 +14,15 @@ export interface GeneratedQuestion {
 
 /**
  * Generates questions using the secure backend Cloud Function.
- * @param apiKey - Deprecated/Ignored. kept for signature compatibility during migration if needed, but preferably remove.
+ * Valida primero si el tier del usuario tiene acceso (bloqueo temporal para free/guest).
+ * @param tier - Tier del usuario para validación local de bloqueo.
  * @param text - Source text.
  * @param difficulty - Difficulty level.
  * @param count - Number of questions.
  * @param types - Array of types e.g. ['MCQ', 'TF'].
  */
 export async function generateQuestions(
-    _apiKey: string, // Kept for now to avoid breaking UploadPage immediately
+    tier: string | undefined,
     text: string,
     difficulty: 'easy' | 'medium' | 'hard',
     count: number,
@@ -30,7 +32,12 @@ export async function generateQuestions(
     answerKey?: string
 ): Promise<any> {
 
-    // Logic moved to backend.
+    // Validación local contra tiers bloqueados
+    // ⚠️ BLOQUEO TEMPORAL — ver config/featureFlags.ts y docs/AI_BLOCKING.md
+    if (isAiBlocked(tier)) {
+        throw new Error('AI_GENERATION_BLOCKED');
+    }
+
     const generate = httpsCallable<any, GeneratedQuestion[]>(functions, 'generateQuestions');
 
     try {

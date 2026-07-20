@@ -45,11 +45,11 @@ export default function ManageContentPage() {
     const [deleteAction, setDeleteAction] = useState<'transfer' | 'orphan' | 'deleteQuestions'>('transfer');
 
     const loadData = async () => {
-        if (!currentUser || currentUser.uid === 'guest') return;
+        const uid = currentUser?.uid || 'guest';
 
         const [allQuestions, topicsData] = await Promise.all([
-            getQuestions(currentUser.uid, undefined, true),
-            getTopicsData(currentUser.uid)
+            getQuestions(uid, undefined, true),
+            getTopicsData(uid)
         ]);
         setQuestions(allQuestions);
         setAllTopicsData(topicsData);
@@ -138,8 +138,8 @@ export default function ManageContentPage() {
     }, [subjectGroups]);
 
     const handleToggle = async (q: Question) => {
-        if (!currentUser) return;
-        await updateQuestion(q.id, currentUser.uid, { disabled: !q.disabled });
+        const uid = currentUser?.uid || 'guest';
+        await updateQuestion(q.id, uid, { disabled: !q.disabled });
         loadData();
     };
 
@@ -154,16 +154,17 @@ export default function ManageContentPage() {
                 updates.answer = p.answer;
             }
         }
-        if (!currentUser) return;
-        await updateQuestion(id, currentUser.uid, updates);
+        const uid = currentUser?.uid || 'guest';
+        await updateQuestion(id, uid, updates);
         setEditingId(null);
         loadData();
     };
 
     const handleAddTopic = async () => {
-        if (!currentUser || !newTopicName.trim()) return;
+        if (!newTopicName.trim()) return;
+        const uid = currentUser?.uid || 'guest';
         const subj = newTopicSubject || undefined;
-        await addTopic(newTopicName.trim(), currentUser.uid, subj);
+        await addTopic(newTopicName.trim(), uid, subj);
         setNewTopicName('');
         setNewTopicSubject('');
         setAddingTopic(false);
@@ -171,34 +172,35 @@ export default function ManageContentPage() {
     };
 
     const handleRenameTopic = async () => {
-        if (!currentUser || !editingTopic) return;
+        if (!editingTopic) return;
+        const uid = currentUser?.uid || 'guest';
         const { oldName, oldSubject, newName, newSubject } = editingTopic;
         if (!newName.trim()) return;
 
         if (oldName !== newName.trim()) {
-            await renameTopicDirect(oldName, oldSubject, newName.trim(), currentUser.uid);
+            await renameTopicDirect(oldName, oldSubject, newName.trim(), uid);
         }
         if (newSubject !== oldSubject) {
-            await updateTopicSubject(newName.trim(), oldSubject, newSubject, currentUser.uid);
+            await updateTopicSubject(newName.trim(), oldSubject, newSubject, uid);
         }
         setEditingTopic(null);
         loadData();
     };
 
     const handleRenameSubject = async () => {
-        if (!currentUser || !editingSubject) return;
+        if (!editingSubject) return;
+        const uid = currentUser?.uid || 'guest';
         const { oldName, newName } = editingSubject;
         if (!newName.trim() || oldName === newName.trim()) {
             setEditingSubject(null);
             return;
         }
-        await renameSubject(oldName, newName.trim(), currentUser.uid);
+        await renameSubject(oldName, newName.trim(), uid);
         setEditingSubject(null);
         loadData();
     };
 
     const handleDeleteSubject = (subjectName: string) => {
-        if (!currentUser) return;
         const group = subjectGroups.find(g => g.name === subjectName);
         if (!group) return;
         setDeletingSubject({ name: subjectName, topicCount: group.topics.length, questionCount: group.questionCount });
@@ -207,8 +209,9 @@ export default function ManageContentPage() {
     };
 
     const handleConfirmDeleteSubject = async () => {
-        if (!currentUser || !deletingSubject) return;
-        await deleteSubject(deletingSubject.name, currentUser.uid, subjectDeleteAction, subjectDeleteTarget || undefined);
+        if (!deletingSubject) return;
+        const uid = currentUser?.uid || 'guest';
+        await deleteSubject(deletingSubject.name, uid, subjectDeleteAction, subjectDeleteTarget || undefined);
         setDeletingSubject(null);
         setSubjectDeleteTarget('');
         loadData();
@@ -223,22 +226,23 @@ export default function ManageContentPage() {
     };
 
     const handleConfirmDelete = async () => {
-        if (!currentUser || !deletingTopic) return;
+        if (!deletingTopic) return;
+        const uid = currentUser?.uid || 'guest';
         const { name, subject } = deletingTopic;
 
         if (deleteAction === 'transfer' && transferTarget) {
             const qList = questions.filter(q => q.topic === name && (subject === 'Sin asignatura' ? (!q.subject || q.subject === 'Uncategorized') : q.subject === subject));
             for (const q of qList) {
-                await updateQuestion(q.id, currentUser.uid, { topic: transferTarget });
+                await updateQuestion(q.id, uid, { topic: transferTarget });
             }
         } else if (deleteAction === 'deleteQuestions') {
             const qList = questions.filter(q => q.topic === name && (subject === 'Sin asignatura' ? (!q.subject || q.subject === 'Uncategorized') : q.subject === subject));
             for (const q of qList) {
-                await deleteQuestion(q.id, currentUser!.uid);
+                await deleteQuestion(q.id, uid);
             }
         }
 
-        await deleteTopic(name, subject, currentUser.uid);
+        await deleteTopic(name, subject, uid);
         setDeletingTopic(null);
         setTransferTarget('');
         loadData();
@@ -251,16 +255,7 @@ export default function ManageContentPage() {
         setExpandedSubjects(newExpanded);
     };
 
-    if (!currentUser || currentUser.uid === 'guest') {
-        return (
-            <div className="max-w-4xl mx-auto pb-20 pt-4 px-4 sm:px-0">
-                <div className="text-center py-20 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                    <Database className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">Inicia sesión para gestionar tu contenido.</p>
-                </div>
-            </div>
-        );
-    }
+    // Guest users can also manage their local content
 
     return (
         <div className="max-w-4xl mx-auto pb-20 pt-4 px-4 sm:px-0">

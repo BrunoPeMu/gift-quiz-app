@@ -1,22 +1,28 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Shield, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { LEGAL_VERSION, LEGAL_URLS, shouldReaccept } from '../config/legal';
 
 export default function TermsModal() {
     const { userProfile, updateUserProfile } = useAuth();
     const [accepted, setAccepted] = useState(false);
-    
-    if (userProfile?.termsAccepted) return null;
+
+    if (!shouldReaccept(!!userProfile?.termsAccepted, userProfile?.termsAcceptedVersion)) {
+        return null;
+    }
 
     const handleAccept = async () => {
         await updateUserProfile({
             termsAccepted: true,
-            termsAcceptedAt: Date.now()
+            termsAcceptedAt: Date.now(),
+            termsAcceptedVersion: LEGAL_VERSION,
+            legalAcceptedVersion: LEGAL_VERSION,
+            legalAcceptedAt: Date.now(),
         });
     };
 
     const handleDecline = () => {
-        // Logout user if they decline
         window.location.href = '/login';
     };
 
@@ -31,6 +37,20 @@ export default function TermsModal() {
                     <p className="text-sm text-slate-500 mt-2">
                         Para usar FlashTests, debes aceptar nuestros términos y condiciones.
                     </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        Versión v{LEGAL_VERSION} — {userProfile?.termsAcceptedVersion && userProfile.termsAcceptedVersion !== LEGAL_VERSION ? 'Actualizada' : 'Vigente'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                        <Link to={LEGAL_URLS.notice} className="text-indigo-400 hover:text-indigo-300 underline-offset-4 hover:underline">
+                            Aviso Legal
+                        </Link>
+                        <Link to={LEGAL_URLS.privacy} className="text-indigo-400 hover:text-indigo-300 underline-offset-4 hover:underline">
+                            Privacidad
+                        </Link>
+                        <Link to={LEGAL_URLS.cookies} className="text-indigo-400 hover:text-indigo-300 underline-offset-4 hover:underline">
+                            Cookies
+                        </Link>
+                    </div>
                 </div>
                 
                 <div 

@@ -1,12 +1,50 @@
 import { collection, addDoc, getDocs, query, where, Timestamp, doc, updateDoc, setDoc, getDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
+
 import type { Question } from '../types';
+
+// --- Local Storage Helpers for Guest Users ---
+const GUEST_QUESTIONS_KEY = 'gift_quiz_guest_questions';
+const GUEST_TOPICS_KEY = 'gift_quiz_guest_topics';
+const GUEST_SUBJECTS_KEY = 'gift_quiz_guest_subjects';
+
+function getGuestData<T>(key: string): T[] {
+    try {
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveGuestData<T>(key: string, data: T[]) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        console.error("Local storage error:", e);
+    }
+}
+// ----------------------------------------------
+
 
 const QUESTIONS_COLLECTION = 'questions';
 const TOPICS_COLLECTION = 'topics';
 
 export async function saveQuestions(questions: Question[], userId: string) {
     if (!userId) throw new Error("userId is required");
+
+    if (userId.startsWith('guest')) {
+        const existing = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const newQuestions = questions.map(q => ({
+            ...q,
+            id: q.id || crypto.randomUUID(),
+            userId: userId,
+            createdAt: Date.now()
+        }));
+        saveGuestData(GUEST_QUESTIONS_KEY, [...existing, ...newQuestions]);
+        return;
+    }
+
     const colRef = collection(db, QUESTIONS_COLLECTION);
     const promises = questions.map(q => {
         const { id, ...data } = q;
@@ -21,6 +59,17 @@ export async function saveQuestions(questions: Question[], userId: string) {
 
 export async function updateQuestion(id: string, userId: string, data: Partial<Question>) {
     if (!userId) throw new Error("userId is required");
+    
+    if (userId.startsWith('guest')) {
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const index = questions.findIndex(q => q.id === id);
+        if (index !== -1) {
+            questions[index] = { ...questions[index], ...data };
+            saveGuestData(GUEST_QUESTIONS_KEY, questions);
+        }
+        return;
+    }
+
     // In a real app, verify ownership first or use security rules.
     // For now, we trust the client implementation to pass the correct ID,
     // but ideally we'd check if doc.data().userId === userId.
@@ -66,6 +115,34 @@ export async function renameTopic(oldName: string, oldSubject: string, newName: 
 
 export async function updateTopicSubject(topicName: string, oldSubject: string, newSubject: string, userId: string) {
     if (!userId) throw new Error("userId is required");
+
+    if (userId.startsWith('guest')) {
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const updatedQuestions = questions.map(q => {
+            const subj = q.subject || '';
+            if (q.topic === topicName && (subj === oldSubject || (oldSubject === '' && subj === 'Uncategorized'))) {
+                return { ...q, subject: newSubject };
+            }
+            return q;
+        });
+        saveGuestData(GUEST_QUESTIONS_KEY, updatedQuestions);
+
+        const topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+        let found = false;
+        const updatedTopics = topics.map(t => {
+            const subj = t.subject || '';
+            if (t.name === topicName && (subj === oldSubject || (oldSubject === '' && subj === 'Uncategorized'))) {
+                found = true;
+                return { ...t, subject: newSubject };
+            }
+            return t;
+        });
+        if (!found) {
+            updatedTopics.push({ name: topicName, subject: newSubject });
+        }
+        saveGuestData(GUEST_TOPICS_KEY, updatedTopics);
+        return;
+    }
 
     // 1. Update in 'topics' collection
     const topicQuery = query(
@@ -115,6 +192,21 @@ export async function updateTopicSubject(topicName: string, oldSubject: string, 
 
 export async function addTopic(name: string, userId: string, subject?: string) {
     if (!userId) throw new Error("userId is required");
+
+    if (userId.startsWith('guest')) {
+        const topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+        const targetSubject = subject || '';
+        const exists = topics.some(t => {
+            const subj = t.subject || '';
+            return t.name === name && (subj === targetSubject || (targetSubject === '' && subj === 'Uncategorized'));
+        });
+        if (!exists) {
+            topics.push({ name, subject: subject || undefined });
+            saveGuestData(GUEST_TOPICS_KEY, topics);
+        }
+        return;
+    }
+
     const colRef = collection(db, TOPICS_COLLECTION);
 
     const q = query(
@@ -148,6 +240,20 @@ export async function getQuestions(userId: string, topic?: string, includeDisabl
     if (!userId) {
         console.warn("getQuestions called without userId");
         return [];
+    }
+
+    if (userId.startsWith('guest')) {
+        let questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        if (topic && topic !== 'All') {
+            questions = questions.filter(q => q.topic === topic);
+        }
+        if (subject && subject !== 'All') {
+            questions = questions.filter(q => q.subject === subject);
+        }
+        if (!includeDisabled) {
+            questions = questions.filter(q => !q.disabled);
+        }
+        return questions;
     }
 
     const colRef = collection(db, QUESTIONS_COLLECTION);
@@ -187,6 +293,21 @@ export async function getTopics(userId: string): Promise<string[]> {
 
 export async function getTopicsData(userId: string): Promise<TopicData[]> {
     if (!userId) return [];
+
+    if (userId.startsWith('guest')) {
+        const topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const pairs = new Set<string>();
+        const addPair = (name: string, subj?: string) => {
+            pairs.add(JSON.stringify({ name, subject: subj || 'Uncategorized' }));
+        };
+        topics.forEach(t => addPair(t.name, t.subject));
+        questions.forEach(q => addPair(q.topic, q.subject));
+        
+        return Array.from(pairs)
+            .map(p => JSON.parse(p) as TopicData)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
 
     const pairs = new Set<string>();
 
@@ -297,6 +418,14 @@ export async function migrateLegacyData(userId: string, forceAll = false) {
 
 export async function deleteQuestion(id: string, userId: string): Promise<void> {
     if (!userId) throw new Error("userId is required");
+
+    if (userId.startsWith('guest')) {
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const filtered = questions.filter(q => q.id !== id);
+        saveGuestData(GUEST_QUESTIONS_KEY, filtered);
+        return;
+    }
+
     const docRef = doc(db, QUESTIONS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists() && docSnap.data().userId === userId) {
@@ -306,6 +435,28 @@ export async function deleteQuestion(id: string, userId: string): Promise<void> 
 
 export async function deleteTopic(topicName: string, subjectName: string, userId: string): Promise<void> {
     if (!userId) throw new Error("userId is required");
+
+    if (userId.startsWith('guest')) {
+        // Remove from topics
+        const topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+        const filteredTopics = topics.filter(t => {
+            const subj = t.subject || '';
+            return !(t.name === topicName && (subj === subjectName || (subjectName === '' && subj === 'Uncategorized')));
+        });
+        saveGuestData(GUEST_TOPICS_KEY, filteredTopics);
+
+        // Remove subject from questions
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const updatedQuestions = questions.map(q => {
+            const subj = q.subject || '';
+            if (q.topic === topicName && (subj === subjectName || (subjectName === '' && subj === 'Uncategorized'))) {
+                return { ...q, subject: undefined };
+            }
+            return q;
+        });
+        saveGuestData(GUEST_QUESTIONS_KEY, updatedQuestions);
+        return;
+    }
 
     // Delete from topics collection
     const topicQuery = query(
@@ -342,6 +493,29 @@ export async function deleteTopic(topicName: string, subjectName: string, userId
 export async function renameTopicDirect(oldName: string, oldSubject: string, newName: string, userId: string): Promise<void> {
     if (!userId) throw new Error("userId is required");
 
+    if (userId.startsWith('guest')) {
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const updatedQuestions = questions.map(q => {
+            const subj = q.subject || '';
+            if (q.topic === oldName && (subj === oldSubject || (oldSubject === '' && subj === 'Uncategorized'))) {
+                return { ...q, topic: newName };
+            }
+            return q;
+        });
+        saveGuestData(GUEST_QUESTIONS_KEY, updatedQuestions);
+
+        const topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+        const updatedTopics = topics.map(t => {
+            const subj = t.subject || '';
+            if (t.name === oldName && (subj === oldSubject || (oldSubject === '' && subj === 'Uncategorized'))) {
+                return { ...t, name: newName };
+            }
+            return t;
+        });
+        saveGuestData(GUEST_TOPICS_KEY, updatedTopics);
+        return;
+    }
+
     const batch = writeBatch(db);
 
     // Update questions
@@ -377,6 +551,16 @@ export async function renameTopicDirect(oldName: string, oldSubject: string, new
 
 export async function addSubject(name: string, userId: string): Promise<void> {
     if (!userId || !name.trim()) return;
+
+    if (userId.startsWith('guest')) {
+        const subjects = getGuestData<{name: string}>(GUEST_SUBJECTS_KEY);
+        if (!subjects.some(s => s.name === name.trim())) {
+            subjects.push({ name: name.trim() });
+            saveGuestData(GUEST_SUBJECTS_KEY, subjects);
+        }
+        return;
+    }
+
     const subjCol = collection(db, 'subjects');
     await addDoc(subjCol, {
         name: name.trim(),
@@ -387,6 +571,31 @@ export async function addSubject(name: string, userId: string): Promise<void> {
 
 export async function renameSubject(oldName: string, newName: string, userId: string): Promise<void> {
     if (!userId || !newName.trim()) return;
+
+    if (userId.startsWith('guest')) {
+        const questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        const updatedQuestions = questions.map(q => {
+            if (q.subject === oldName) return { ...q, subject: newName.trim() };
+            return q;
+        });
+        saveGuestData(GUEST_QUESTIONS_KEY, updatedQuestions);
+
+        const topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+        const updatedTopics = topics.map(t => {
+            if (t.subject === oldName) return { ...t, subject: newName.trim() };
+            return t;
+        });
+        saveGuestData(GUEST_TOPICS_KEY, updatedTopics);
+
+        const subjects = getGuestData<{name: string}>(GUEST_SUBJECTS_KEY);
+        const updatedSubjects = subjects.map(s => {
+            if (s.name === oldName) return { name: newName.trim() };
+            return s;
+        });
+        saveGuestData(GUEST_SUBJECTS_KEY, updatedSubjects);
+        return;
+    }
+
     const batch = writeBatch(db);
 
     const q = query(collection(db, QUESTIONS_COLLECTION), where('subject', '==', oldName), where('userId', '==', userId));
@@ -402,6 +611,31 @@ export async function renameSubject(oldName: string, newName: string, userId: st
 
 export async function deleteSubject(subjectName: string, userId: string, action: 'transfer' | 'orphan' | 'deleteAll', targetSubject?: string): Promise<void> {
     if (!userId) return;
+
+    if (userId.startsWith('guest')) {
+        let questions = getGuestData<Question>(GUEST_QUESTIONS_KEY);
+        let topics = getGuestData<TopicData>(GUEST_TOPICS_KEY);
+
+        if (action === 'transfer' && targetSubject) {
+            questions = questions.map(q => q.subject === subjectName ? { ...q, subject: targetSubject } : q);
+            topics = topics.map(t => t.subject === subjectName ? { ...t, subject: targetSubject } : t);
+        } else if (action === 'orphan') {
+            questions = questions.map(q => q.subject === subjectName ? { ...q, subject: undefined } : q);
+            topics = topics.map(t => t.subject === subjectName ? { ...t, subject: undefined } : t);
+        } else if (action === 'deleteAll') {
+            questions = questions.filter(q => q.subject !== subjectName);
+            topics = topics.filter(t => t.subject !== subjectName);
+        }
+        
+        saveGuestData(GUEST_QUESTIONS_KEY, questions);
+        saveGuestData(GUEST_TOPICS_KEY, topics);
+
+        const subjects = getGuestData<{name: string}>(GUEST_SUBJECTS_KEY);
+        const filteredSubjects = subjects.filter(s => s.name !== subjectName);
+        saveGuestData(GUEST_SUBJECTS_KEY, filteredSubjects);
+        return;
+    }
+
     const batch = writeBatch(db);
 
     const qSnap = await getDocs(query(collection(db, QUESTIONS_COLLECTION), where('subject', '==', subjectName), where('userId', '==', userId)));

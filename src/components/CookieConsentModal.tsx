@@ -1,38 +1,44 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Cookie, Crown } from 'lucide-react';
+import { Cookie, Crown, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { LEGAL_VERSION, LEGAL_URLS, shouldReaccept } from '../config/legal';
 
 export default function CookieConsentModal() {
-    const { userProfile, updateUserProfile, togglePremium } = useAuth();
+    const { userProfile, updateUserProfile } = useAuth();
     const [showDetails, setShowDetails] = useState(false);
     
-    // Check if user has accepted cookies OR has active subscription
-    const hasAcceptedCookies = userProfile?.cookiesAccepted;
     const hasActiveSubscription = userProfile?.subscription?.status === 'active' || userProfile?.isPremium || userProfile?.tier === 'pro';
+    const needsCookiesConsent = shouldReaccept(!!userProfile?.cookiesAccepted, userProfile?.cookiesAcceptedVersion);
     
-    if (hasAcceptedCookies || hasActiveSubscription) return null;
+    if (hasActiveSubscription || !needsCookiesConsent) return null;
 
     const handleAcceptCookies = async () => {
         await updateUserProfile({
             cookiesAccepted: true,
-            cookiesAcceptedAt: Date.now()
+            cookiesAcceptedAt: Date.now(),
+            cookiesAcceptedVersion: LEGAL_VERSION,
+            personalizedAds: true,
+        });
+    };
+
+    const handleRejectCookies = async () => {
+        await updateUserProfile({
+            cookiesAccepted: true,
+            cookiesAcceptedAt: Date.now(),
+            cookiesAcceptedVersion: LEGAL_VERSION,
+            personalizedAds: false,
         });
     };
 
     const handleSubscribe = async () => {
-        // For demo/testing purposes, toggle premium
-        // In production, this would redirect to Stripe checkout
-        togglePremium();
         await updateUserProfile({
-            isPremium: true,
-            tier: 'pro',
-            subscription: {
-                plan: 'monthly',
-                status: 'active',
-                startDate: Date.now(),
-                provider: 'manual'
-            }
+            cookiesAccepted: true,
+            cookiesAcceptedAt: Date.now(),
+            cookiesAcceptedVersion: LEGAL_VERSION,
+            personalizedAds: true,
         });
+        window.location.href = '/?showPricing=true';
     };
 
     return (
@@ -50,6 +56,14 @@ export default function CookieConsentModal() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                         Para continuar usando FlashTests, debes elegir una opción:
                     </p>
+                    <div className="mb-5 flex flex-wrap justify-center gap-3 text-[11px] text-slate-400">
+                        <Link to={LEGAL_URLS.cookies} className="hover:text-indigo-400 underline-offset-4 hover:underline">
+                            Política de Cookies
+                        </Link>
+                        <Link to={LEGAL_URLS.privacy} className="hover:text-indigo-400 underline-offset-4 hover:underline">
+                            Privacidad
+                        </Link>
+                    </div>
                     
                     <div className="space-y-3 mb-6">
                         {/* Option 1: Accept Cookies */}
@@ -60,13 +74,27 @@ export default function CookieConsentModal() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="font-semibold text-slate-900 dark:text-white">Aceptar cookies</h3>
-                                    <p className="text-xs text-slate-500">Ver publicidad y usar la app gratis</p>
+                                    <p className="text-xs text-slate-500">Publicidad personalizada + 3 créditos IA/día</p>
                                 </div>
                                 <Cookie className="w-5 h-5 text-indigo-500" />
                             </div>
                         </button>
+
+                        {/* Option 2: Reject non-essential cookies */}
+                        <button
+                            onClick={handleRejectCookies}
+                            className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors text-left"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-semibold text-slate-900 dark:text-white">Solo cookies necesarias</h3>
+                                    <p className="text-xs text-slate-500">Tests manuales sin IA ni publicidad personalizada</p>
+                                </div>
+                                <XCircle className="w-5 h-5 text-slate-400" />
+                            </div>
+                        </button>
                         
-                        {/* Option 2: Subscribe */}
+                        {/* Option 3: Subscribe */}
                         <button
                             onClick={handleSubscribe}
                             className="w-full p-4 rounded-xl border-2 border-amber-200 dark:border-amber-800 hover:border-amber-500 dark:hover:border-amber-500 transition-colors text-left bg-amber-50 dark:bg-amber-900/10"
@@ -102,12 +130,6 @@ export default function CookieConsentModal() {
                             <p className="mt-2">Si te suscribes, no necesitas aceptar cookies publicitarias. El plan PRO incluye sin publicidad.</p>
                         </div>
                     )}
-                </div>
-                
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700 text-center">
-                    <p className="text-xs text-slate-400">
-                        Si no eliges ninguna opción, no podrás usar la app.
-                    </p>
                 </div>
             </div>
         </div>

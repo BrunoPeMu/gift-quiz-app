@@ -31,38 +31,37 @@ function isSameMonth(d1: Date, d2: Date) {
         d1.getMonth() === d2.getMonth();
 }
 
-export async function checkMonthlyCreditRefill(userId: string, currentData: { credits?: number, lastCreditReset?: any }): Promise<{ credits: number, lastCreditReset: number } | null> {
+/**
+ * Refill mensual de créditos según el tier del usuario.
+ *
+ * - free (default): +3 créditos, cap 9.
+ * - basic: +30 créditos, SIN cap (rollover). Se ejecuta al inicio de cada mes.
+ * - pro: no aplica (tiene créditos ilimitados, no se descuentan en backend).
+ * - guest: no aplica (no tiene UID, no hay refill).
+ */
+export async function checkMonthlyCreditRefill(userId: string, currentData: { credits?: number, lastCreditReset?: any, tier?: string }): Promise<{ credits: number, lastCreditReset: number } | null> {
     if (!userId) return null;
 
     const now = new Date();
     const lastReset = currentData.lastCreditReset ? new Date(currentData.lastCreditReset) : null;
 
-    // If never reset (e.g. legacy user) or reset was in a previous month
     if (!lastReset || !isSameMonth(now, lastReset)) {
         const currentCredits = currentData.credits || 0;
-        // Add 3 credits, capped at 9
-        // If user has 8, 8+3=11 -> 9
-        // If user has 9, 9+3=12 -> 9
-        // If user has 0, 0+3=3 -> 3
+        const tier = currentData.tier || 'free';
 
-        // Wait, if user has >= 9, do we update the date?
-        // "se pueden acumular un máximo de 9 créditos si no se gastan"
-        // Implicitly: if I have 9, I don't get more. But do I "consummate" my monthly refill?
-        // Usually yes, the month "passed" and I missed the chance to get more.
-        // So we should update the date even if credits don't change?
-        // "Si la suma supera 9, lo dejamos en 9"
+        let newCredits: number;
 
-        let newCredits = currentCredits + 3;
-        if (newCredits > 9) newCredits = 9;
-
-        // Optimization: If credits are already 9 (or more) AND lastReset was significantly in the past,
-        // we still want to update 'lastCreditReset' so we don't check this every single time the user logs in 
-        // (though checking date is cheap, writing to DB is what we want to avoid).
-        // Actually, if we update date, we incur a write.
-        // If credits = 9, and we don't update date, next time we check:
-        // "!isSameMonth" is true. We calculate newCredits = 9+3 -> 9.
-        // If newCredits (9) === currentCredits (9), should we write?
-        // It's better to write the new DATE so we know "we processed this month".
+        if (tier === 'basic') {
+            // basic: añade 30 créditos/mes con rollover (sin cap)
+            newCredits = currentCredits + 30;
+        } else if (tier === 'pro') {
+            // pro: no necesita refill (backend no descuenta), pero actualizamos fecha
+            newCredits = currentCredits;
+        } else {
+            // free: +3 créditos, cap 9
+            newCredits = currentCredits + 3;
+            if (newCredits > 9) newCredits = 9;
+        }
 
         const updateData = {
             credits: newCredits,

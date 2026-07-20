@@ -69,11 +69,17 @@ export interface UserProfile {
 
     // Admin / Billing Extended Fields
     subscription?: {
-        plan: 'free' | 'monthly' | 'annual' | 'lifetime';
-        status: 'active' | 'canceled' | 'expired' | 'past_due' | 'trialing';
+        plan: 'free' | 'basic' | 'monthly' | 'annual' | 'lifetime';
+        status: 'active' | 'canceled' | 'expired' | 'past_due' | 'trialing' | 'paused';
         startDate?: number;
+        serviceStartedAt?: number;
+        firstUseAt?: number;
+        nonRefundableAfterUse?: boolean;
         renewalDate?: number;
+        subscriptionId?: string;
+        customerId?: string;
         provider?: 'stripe' | 'manual' | 'other';
+        billing?: 'monthly' | 'yearly';
     };
     adminNotes?: string; // Internal notes for admins
 
@@ -81,12 +87,40 @@ export interface UserProfile {
     tier?: 'guest' | 'free' | 'basic' | 'pro';
     credits?: number;
     lastCreditReset?: any;
+    usage?: {
+        totalGenerations?: number;
+        paidGenerations?: number;
+        lastGenerationAt?: number;
+        minuteWindowStart?: number;
+        minuteWindowCount?: number;
+        hourWindowStart?: number;
+        hourWindowCount?: number;
+        dayWindowStart?: number;
+        dayWindowCount?: number;
+    };
+    purchaseAttempts?: {
+        windowStart?: number;
+        windowCount?: number;
+        lastAttemptAt?: number;
+        total?: number;
+    };
+    accountFlags?: {
+        refundAbuse?: boolean;
+        purchaseReviewRequired?: boolean;
+        blockedFromCheckoutUntil?: number;
+        lastRefundReason?: string;
+    };
     
     // Legal compliance
     termsAccepted?: boolean;
     termsAcceptedAt?: number;
+    termsAcceptedVersion?: string;
     cookiesAccepted?: boolean;
     cookiesAcceptedAt?: number;
+    cookiesAcceptedVersion?: string;
+    personalizedAds?: boolean;
+    legalAcceptedVersion?: string;
+    legalAcceptedAt?: number;
 }
 
 export interface Subject {
@@ -104,4 +138,14 @@ export interface SharedQuiz {
     questions: Question[];
     createdAt: number;
     expiresAt?: number;
+}
+
+export interface SharedTopic {
+    id: string;
+    creatorId: string;
+    creatorName?: string;
+    topicName: string;
+    subjectName?: string;
+    questions: Question[];
+    createdAt: number;
 }

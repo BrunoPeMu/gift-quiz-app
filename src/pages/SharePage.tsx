@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Play, AlertCircle, Share2, Target, HelpCircle, Shuffle } from 'lucide-react';
+import { Play, AlertCircle, Share2, Target, HelpCircle, Shuffle, Copy, Check } from 'lucide-react';
 import { getSharedQuiz } from '../services/shareService';
 import type { SharedQuiz } from '../types';
 
@@ -12,6 +12,7 @@ export default function SharePage() {
     const [quiz, setQuiz] = useState<SharedQuiz | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         if (!shareId) return;
@@ -39,6 +40,16 @@ export default function SharePage() {
                 questions: quiz.questions // Pass explicit questions
             }
         });
+    };
+
+    const handleCopyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setCopied(false);
+        }
     };
 
     if (loading) {
@@ -125,6 +136,23 @@ export default function SharePage() {
             >
                 <Play className="w-5 h-5 mr-2 fill-current group-hover:scale-110 transition-transform" />
                 {t('share.start', { defaultValue: 'Empezar Quiz Ahora' })}
+            </button>
+
+            <button
+                onClick={handleCopyLink}
+                className="w-full mt-3 flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+                {copied ? (
+                    <>
+                        <Check className="w-4 h-4 text-green-500" />
+                        ¡Enlace copiado!
+                    </>
+                ) : (
+                    <>
+                        <Copy className="w-4 h-4" />
+                        Copiar enlace
+                    </>
+                )}
             </button>
 
             <p className="text-center mt-6 text-sm text-slate-400">
